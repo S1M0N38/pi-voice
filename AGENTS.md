@@ -6,14 +6,17 @@
 
 pi-voice is an HTTP server for Kokoro ONNX TTS inference. It manages model downloads, loading, and audio synthesis through a REST API. Eventually it will ship as a pi package with a `/voice` TUI command for interactive control.
 
-### Current State: Server + Tests Only
+### Current State: Server + Extension + CLI
 
-The codebase is currently stripped down to the core TTS server and its integration tests. The pi extension (TUI, `/voice` command, skills, themes) will be added later.
+The codebase includes the core TTS server, the pi extension (TUI `/voice` command + `tts` tool), and a CLI for server management.
 
 ```
 extensions/
+  index.ts             # Extension entry point (/voice command, tts tool)
   server.ts            # Persistent HTTP server for Kokoro ONNX TTS model
   server.test.ts       # Integration tests (node:test, real kokoro-js q4)
+src/
+  cli.ts               # CLI for server/model management (pi-voice)
 package.json           # Dependencies, scripts
 biome.json             # Linter/formatter config
 tsconfig.json          # Type checking only (noEmit)
@@ -21,13 +24,9 @@ tsconfig.json          # Type checking only (noEmit)
 
 ### Future: Full Pi Package
 
-When the server is stable, the pi extension layer will be added back:
+Remaining items to add:
 
 ```
-extensions/
-  index.ts             # Extension entry point (/voice command, TUI settings)
-  server.ts            # HTTP server (current)
-  server.test.ts       # Integration tests (current)
 skills/voice/SKILL.md  # On-demand skill instructions
 prompts/voice.md       # Slash-command prompt template
 themes/voice.json      # Theme with all 51 color tokens
@@ -145,17 +144,11 @@ Clarify what the user needs. Read relevant pi docs before implementing extension
 - Model lifecycle via `loadModel()`, `unloadModel()`, `downloadModel()`
 - WAV encoding inline (Float32 → 16-bit PCM)
 
-**Extension** (`extensions/index.ts`) — future:
-```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-export default function (pi: ExtensionAPI) {
-  pi.registerCommand("voice", {
-    description: "Configure pi-voice TTS server and models",
-    handler: async (_args, ctx) => { /* TUI settings */ },
-  });
-}
-```
+**Extension** (`extensions/index.ts`):
+- `/voice` command with custom TUI (↑↓ navigate, ←→ cycle values, Enter test, r reset, Esc close)
+- `tts` tool for LLM-initiated speech synthesis
+- Settings: TTS on/off, voice selector with nationality/gender hints, speed (0.5–3.0)
+- Persistence: `~/.pi/voice.json` for defaults, session overrides via `pi.appendEntry()`
 
 ### Step 3: Verify
 
@@ -169,13 +162,7 @@ npm run typecheck && npm run lint
 npm test                # Server integration tests
 ```
 
-For future pi extension testing:
-```bash
-pi -ne -e . --no-session -p "..."     # Print mode (tools)
-pi -ne -e . --no-session              # Interactive mode (/voice command)
-```
-
-For TUI testing (once the `/voice` command with TUI is implemented), use the **pi-test** skill:
+For TUI testing, use the **pi-test** skill:
 ```bash
 pilotty spawn --name voice-test --cwd . -- pi -ne -e . --no-session
 pilotty wait-for -s voice-test "[Skills]" -t 10000
