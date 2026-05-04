@@ -1,24 +1,24 @@
 {
   "name": "pi-voice",
   "version": "0.1.0",
-  "description": "Give a voice to your Pi agent.",
+  "description": "HTTP server for Kokoro TTS — text-to-speech via ONNX inference.",
   "type": "module",
   "license": "MIT",
   "author": "S1M0N38",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "tts",
+    "kokoro",
+    "speech-synthesis"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/S1M0N38/pi-voice"
   },
-  "keywords": [
-    "pi-package",
-    "pi",
-    "pi-coding-agent"
-  ],
   "files": [
     "extensions",
-    "skills",
-    "prompts",
-    "themes",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
@@ -28,36 +28,19 @@
     "access": "public"
   },
   "scripts": {
-    "test": "echo \"No tests yet\" && exit 0",
+    "test": "node --import jiti extensions/server.test.ts",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "server": "node --import jiti extensions/server.ts"
   },
-  "pi": {
-    "extensions": [
-      "./extensions"
-    ],
-    "skills": [
-      "./skills"
-    ],
-    "prompts": [
-      "./prompts"
-    ],
-    "themes": [
-      "./themes"
-    ]
-  },
-  "peerDependencies": {
-    "@mariozechner/pi-agent-core": "*",
-    "@mariozechner/pi-ai": "*",
-    "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*",
-    "typebox": "*"
+  "dependencies": {
+    "jiti": "^2.4.2",
+    "kokoro-js": "^1.2.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
-    "@mariozechner/pi-ai": "^0.70.0",
     "@mariozechner/pi-coding-agent": "^0.70.0",
     "typebox": "^1.1.24",
     "typescript": "^5.0.0"
