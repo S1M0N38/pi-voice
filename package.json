@@ -38,6 +38,10 @@
   },
   "scripts": {
     "test": "node --import jiti extensions/server.test.ts",
+    "test:tui": "bash test/tui.sh",
+    "test:tts-tool": "bash test/tts-tool.sh",
+    "test:auto-tts": "bash test/auto-tts.sh",
+    "test:e2e": "bash test/run.sh",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
