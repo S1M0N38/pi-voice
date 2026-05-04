@@ -175,6 +175,14 @@ pi -ne -e . --no-session -p "..."     # Print mode (tools)
 pi -ne -e . --no-session              # Interactive mode (/voice command)
 ```
 
+For TUI testing (once the `/voice` command with TUI is implemented), use the **pi-test** skill:
+```bash
+pilotty spawn --name voice-test --cwd . -- pi -ne -e . --no-session
+pilotty wait-for -s voice-test "[Skills]" -t 10000
+pilotty type -s voice-test "/voice" && pilotty key -s voice-test Enter
+pilotty snapshot -s voice-test --format text  # verify rendered TUI
+```
+
 ### Step 5: Commit
 
 Conventional commit format: `feat:`, `fix:`, `docs:`, `chore:`, `ci:`, `refactor:`
