@@ -43,7 +43,8 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "cli": "node --import jiti src/cli.ts",
-    "server": "node --import jiti extensions/server.ts"
+    "server": "node --import jiti extensions/server.ts",
+    "prepare": "node --import jiti src/prepare.js"
   },
   "dependencies": {
     "jiti": "^2.4.2",
