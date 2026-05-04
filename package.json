@@ -1,6 +1,6 @@
 {
   "name": "pi-voice",
-  "version": "1.1.0",
+  "version": "0.1.0",
   "description": "Give a voice to your Pi agent.",
   "type": "module",
   "license": "MIT",
