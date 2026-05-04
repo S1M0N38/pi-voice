@@ -1,15 +1,13 @@
-# pi-package-template
+# pi-voice
 
-A minimal starter template for building [pi](https://pi.dev) packages.
-
-Use this as a starting point to create your own pi package with extensions, skills, prompt templates, and themes.
+Give a voice to your Pi agent. A [pi](https://pi.dev) package for adding voice capabilities to your coding agent.
 
 ## Quick Start
 
 ```bash
 # 1. Clone this template
-git clone https://github.com/YOU/pi-package-template.git my-pi-package
-cd my-pi-package
+git clone https://github.com/S1M0N38/pi-voice.git
+cd pi-voice
 
 # 2. Install dev dependencies (for type checking)
 npm install
@@ -28,7 +26,7 @@ npm publish
 ## What's Included
 
 ```
-pi-package-template/
+pi-voice/
 ├── extensions/
 │   └── index.ts          # Sample extension (tool + command + event)
 ├── skills/

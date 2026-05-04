@@ -1,10 +1,10 @@
-# Pi Package Template — Agent Context
+# pi-voice — Agent Context
 
 ## Project Overview
 
-This is a **pi package template** — a starter kit for building [pi](https://pi.dev) packages. Packages bundle extensions, skills, prompt templates, and themes, and are distributed via npm or git.
+**pi-voice** — Give a voice to your Pi agent.
 
-Users fork this template to create their own pi packages. The sample code demonstrates all four resource types and should be replaced with real functionality.
+This pi package provides voice capabilities to [pi](https://pi.dev) agents. Packages bundle extensions, skills, prompt templates, and themes, and are distributed via npm or git.
 
 **Tech Stack:** TypeScript (no build step — pi loads `.ts` directly via jiti), typebox for schemas, biome for lint/format.
 
