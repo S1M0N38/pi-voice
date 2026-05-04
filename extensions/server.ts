@@ -211,6 +211,32 @@ async function downloadModel(dtype: DType): Promise<void> {
   console.log(`[pi-voice] Auto-activated ${dtype}.`);
 }
 
+async function downloadOnlyModel(dtype: DType): Promise<void> {
+  await importKokoro();
+
+  console.log(`[pi-voice] Downloading model (no activate): ${MODEL_ID} (dtype=${dtype}) ...`);
+  const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
+    dtype,
+    device: "cpu",
+  });
+  console.log(`[pi-voice] Download complete (${dtype}). Disposing temporary instance...`);
+  markDownloaded(dtype);
+
+  // Immediately dispose — kokoro-js always loads into memory,
+  // so we release it right away to keep the single-model invariant.
+  try {
+    await instance.model.dispose();
+  } catch (err) {
+    console.warn(
+      `[pi-voice] Error disposing download instance: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  if (typeof global.gc === "function") {
+    global.gc();
+  }
+  console.log(`[pi-voice] Model ${dtype} saved to disk (not activated).`);
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -265,6 +291,7 @@ async function handleModelsDownload(req: IncomingMessage, res: ServerResponse) {
   try {
     const body = JSON.parse(await readBody(req));
     const dtype = body.dtype as string;
+    const activate = body.activate !== false; // default: true
 
     if (!dtype || !isValidDtype(dtype)) {
       json(res, { error: `Invalid dtype. Must be one of: ${DTYPES.join(", ")}` }, 400);
@@ -273,13 +300,12 @@ async function handleModelsDownload(req: IncomingMessage, res: ServerResponse) {
 
     if (isDtypeDownloaded(dtype)) {
       markDownloaded(dtype);
-      // Auto-activate if no model is loaded
-      if (!tts) {
+      if (activate) {
         try {
           await loadModel(dtype);
         } catch (err) {
           console.warn(
-            `[pi-voice] Auto-activate failed: ${err instanceof Error ? err.message : String(err)}`,
+            `[pi-voice] Activate failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       }
@@ -287,7 +313,11 @@ async function handleModelsDownload(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    await downloadModel(dtype);
+    if (activate) {
+      await downloadModel(dtype);
+    } else {
+      await downloadOnlyModel(dtype);
+    }
     json(res, { message: `Model ${dtype} downloaded successfully`, dtype });
   } catch (err) {
     console.error("[pi-voice] Download error:", err);

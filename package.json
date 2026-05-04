@@ -17,13 +17,22 @@
     "type": "git",
     "url": "https://github.com/S1M0N38/pi-voice"
   },
+  "bin": {
+    "pi-voice": "./src/cli.ts"
+  },
   "files": [
     "extensions",
+    "src",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
     "!.github"
   ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -33,11 +42,18 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "cli": "node --import jiti src/cli.ts",
     "server": "node --import jiti extensions/server.ts"
   },
   "dependencies": {
     "jiti": "^2.4.2",
     "kokoro-js": "^1.2.1"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@mariozechner/pi-ai": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
