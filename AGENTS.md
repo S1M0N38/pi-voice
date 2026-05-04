@@ -4,7 +4,7 @@
 
 **pi-voice** — Give a voice to your Pi agent.
 
-This pi package provides voice capabilities to [pi](https://pi.dev) agents. Packages bundle extensions, skills, prompt templates, and themes, and are distributed via npm or git.
+pi-voice adds text-to-speech capabilities to your Pi coding agent, allowing it to read responses aloud and provide audio feedback during development sessions.
 
 **Tech Stack:** TypeScript (no build step — pi loads `.ts` directly via jiti), typebox for schemas, biome for lint/format.
 
