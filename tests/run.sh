@@ -10,8 +10,7 @@
 # Usage:
 #   bash tests/run.sh              # run all tests
 #   bash tests/run.sh tui          # run only TUI test
-#   bash tests/run.sh tts-tool     # run only tts tool test
-#   bash tests/run.sh auto-tts     # run only auto-TTS test
+#   bash tests/run.sh toggle       # run only toggle test
 
 set -euo pipefail
 
@@ -26,7 +25,7 @@ RESET='\033[0m'
 # Select tests
 TESTS=( "$@" )
 if [ ${#TESTS[@]} -eq 0 ]; then
-  TESTS=(tui tts-tool auto-tts status-bar)
+  TESTS=(tui toggle)
 fi
 
 TOTAL_PASSED=0
@@ -37,7 +36,7 @@ for test_name in "${TESTS[@]}"; do
   test_file="$SCRIPT_DIR/${test_name}.sh"
   if [ ! -f "$test_file" ]; then
     echo -e "${RED}Unknown test: $test_name${RESET}"
-    echo "Available: tui, tts-tool, auto-tts, status-bar"
+    echo "Available: tui, toggle"
     exit 1
   fi
 
