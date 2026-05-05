@@ -9,7 +9,7 @@ pi-voice is a text-to-speech package for the [Pi coding agent](https://github.co
 ## Installation
 
 ```bash
-pi install npm:pi-voice
+pi install npm:@s1m0n38/pi-voice
 ```
 
 The `pi-voice` CLI is available after install. Start the server and download the default model:
