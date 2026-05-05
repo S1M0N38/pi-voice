@@ -471,10 +471,10 @@ export default function (pi: ExtensionAPI) {
                   : "dim";
             lines.push(`  ${theme.fg(statusColor, statusText)}`);
             const serverHint = health?.modelLoaded
-              ? theme.fg("dim", "  npm run server -- --stop to stop")
+              ? theme.fg("dim", "  pi-voice server stop to stop")
               : health
-                ? theme.fg("dim", "  npm run server to start")
-                : theme.fg("dim", "  npm run server to start");
+                ? theme.fg("dim", "  pi-voice server start to start")
+                : theme.fg("dim", "  pi-voice server start to start");
             lines.push(serverHint);
 
             // Active events
