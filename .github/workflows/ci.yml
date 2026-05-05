@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install
+      - run: rm -f package-lock.json && npm install
 
       - name: Type check
         run: npm run typecheck
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm install
+      - run: rm -f package-lock.json && npm install
 
       - name: Cache HuggingFace models
         uses: actions/cache@v4
