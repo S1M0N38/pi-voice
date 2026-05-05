@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm ci
+      - run: npm install
 
       - name: Type check
         run: npm run typecheck
@@ -33,8 +33,7 @@ jobs:
         with:
           node-version: 22
 
-      - run: npm ci
-      - run: npm install --include=optional sharp
+      - run: npm install
 
       - name: Cache HuggingFace models
         uses: actions/cache@v4
