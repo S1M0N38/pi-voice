@@ -99,6 +99,34 @@ The server exposes HTTP endpoints at `http://127.0.0.1:8181`:
 | POST | `/tts` | Synthesize text → WAV audio |
 | POST | `/shutdown` | Graceful shutdown |
 
+## Events
+
+pi-voice emits events on the pi event bus (`pi.events`) so other extensions can integrate with TTS activity.
+
+| Event | Payload | When |
+|-------|---------|------|
+| `voice:config` | `{ enabled, voice, speed }` | Any setting change via `/voice` |
+| `voice:speak_start` | `{ text, voice, speed, source }` | Synthesis requested |
+| `voice:speak_end` | `{ text, source, error? }` | Playback done or failed |
+
+`source` is `"tool"` (LLM invoked tts), `"auto"` (auto-TTS handler), or `"sample"` (/voice preview).
+
+```typescript
+// React to config changes
+pi.events.on("voice:config", ({ enabled, voice, speed }) => {
+  // update status bar, toggle features, etc.
+});
+
+// Track speech activity
+pi.events.on("voice:speak_start", ({ text, source }) => {
+  if (source === "auto") console.log(`[TTS] ${text}`);
+});
+
+pi.events.on("voice:speak_end", ({ error }) => {
+  if (error) console.warn(`TTS failed: ${error}`);
+});
+```
+
 ## License
 
 MIT

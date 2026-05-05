@@ -63,6 +63,35 @@ interface VoiceSessionState {
   speed?: number;
 }
 
+// ── Event Types (exported) ──────────────────────────────────────
+
+export type VoiceSpeakSource = "tool" | "auto" | "sample";
+
+export interface VoiceConfigEvent {
+  enabled: boolean;
+  voice: string;
+  speed: number;
+}
+
+export interface VoiceSpeakStartEvent {
+  text: string;
+  voice: string;
+  speed: number;
+  source: VoiceSpeakSource;
+}
+
+export interface VoiceSpeakEndEvent {
+  text: string;
+  source: VoiceSpeakSource;
+  error?: string;
+}
+
+export interface VoiceEventMap {
+  "voice:config": VoiceConfigEvent;
+  "voice:speak_start": VoiceSpeakStartEvent;
+  "voice:speak_end": VoiceSpeakEndEvent;
+}
+
 // ── Configuration Schema (TypeBox) ───────────────────────────────
 
 const SummaryModelSchema = Type.Object({
@@ -263,74 +292,12 @@ async function generateSpeechText(
   }
 }
 
-async function handleAutoTTS(
-  eventName: string,
-  event: any,
-  ctx: ExtensionContext,
-  config: FullVoiceConfig,
-): Promise<void> {
-  try {
-    if (!config.enabled) return;
-    if (!config.events?.[eventName]) return;
-    // summaryModel is optional — falls back to ctx.model
-
-    const eventConfig = config.events[eventName];
-    const context = extractLastMessage(event);
-    if (!context) return;
-
-    const text = await generateSpeechText(eventConfig.prompt, context, ctx, config.summaryModel);
-    if (!text) return;
-
-    await speak(text, config);
-  } catch (error) {
-    console.warn("[pi-voice] Auto-TTS error:", error);
-  }
-}
-
-// Async speak — fetches TTS audio and plays it in the background.
-async function speak(text: string, config: FullVoiceConfig): Promise<void> {
-  try {
-    const body = {
-      text,
-      voice: config.voice,
-      speed: config.speed,
-    };
-
-    const res = await fetch(`http://${config.host}:${config.port}/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errData = (await res.json()) as { error: string };
-      throw new Error(errData.error);
-    }
-
-    const wavBuffer = Buffer.from(await res.arrayBuffer());
-    const outPath = join(homedir(), ".pi", `voice-${Date.now()}.wav`);
-    mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
-    writeFileSync(outPath, wavBuffer);
-
-    const cmd = process.platform === "darwin" ? "afplay" : "aplay";
-    execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
-      if (err) console.warn("[pi-voice] Playback error:", err);
-      try {
-        unlinkSync(outPath);
-      } catch {
-        /* ignore */
-      }
-    });
-  } catch (error) {
-    console.warn("[pi-voice] TTS error:", error);
-  }
-}
-
 // ── Extension ──────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
   let defaults = loadConfig();
   let session: VoiceSessionState = {};
+  let currentCtx: ExtensionContext | undefined;
 
   function getEffective(): FullVoiceConfig {
     return {
@@ -361,6 +328,95 @@ export default function (pi: ExtensionAPI) {
       }
     }
     defaults = loadConfig();
+  }
+
+  // ── Speak + Auto-TTS (closured over pi) ─────────────────────
+
+  // Async speak — fetches TTS audio and plays it in the background.
+  async function speak(
+    text: string,
+    config: FullVoiceConfig,
+    source: VoiceSpeakSource,
+  ): Promise<void> {
+    const startEvent: VoiceSpeakStartEvent = {
+      text,
+      voice: config.voice,
+      speed: config.speed,
+      source,
+    };
+    pi.events.emit("voice:speak_start", startEvent);
+
+    try {
+      const body = {
+        text,
+        voice: config.voice,
+        speed: config.speed,
+      };
+
+      const res = await fetch(`http://${config.host}:${config.port}/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = (await res.json()) as { error: string };
+        throw new Error(errData.error);
+      }
+
+      const wavBuffer = Buffer.from(await res.arrayBuffer());
+      const outPath = join(homedir(), ".pi", `voice-${Date.now()}.wav`);
+      mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
+      writeFileSync(outPath, wavBuffer);
+
+      const cmd = process.platform === "darwin" ? "afplay" : "aplay";
+      execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
+        if (err) console.warn("[pi-voice] Playback error:", err);
+        const endEvent: VoiceSpeakEndEvent = {
+          text,
+          source,
+          ...(err ? { error: err.message } : {}),
+        };
+        pi.events.emit("voice:speak_end", endEvent);
+        try {
+          unlinkSync(outPath);
+        } catch {
+          /* ignore */
+        }
+      });
+    } catch (error) {
+      console.warn("[pi-voice] TTS error:", error);
+      const endEvent: VoiceSpeakEndEvent = {
+        text,
+        source,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      pi.events.emit("voice:speak_end", endEvent);
+    }
+  }
+
+  async function handleAutoTTS(
+    eventName: string,
+    event: any,
+    ctx: ExtensionContext,
+    config: FullVoiceConfig,
+  ): Promise<void> {
+    try {
+      if (!config.enabled) return;
+      if (!config.events?.[eventName]) return;
+      // summaryModel is optional — falls back to ctx.model
+
+      const eventConfig = config.events[eventName];
+      const context = extractLastMessage(event);
+      if (!context) return;
+
+      const text = await generateSpeechText(eventConfig.prompt, context, ctx, config.summaryModel);
+      if (!text) return;
+
+      await speak(text, config, "auto");
+    } catch (error) {
+      console.warn("[pi-voice] Auto-TTS error:", error);
+    }
   }
 
   // ── Server API helpers ─────────────────────────────────────────
@@ -418,33 +474,59 @@ export default function (pi: ExtensionAPI) {
           { id: "speed" },
         ];
 
+        const sampleText = "The quick brown fox jumps over the lazy dog.";
+
+        function emitConfig() {
+          pi.events.emit("voice:config", {
+            enabled,
+            voice: voices.length > 0 ? voices[voiceIdx] : defaults.voice,
+            speed: Number.parseFloat(SPEED_VALUES[speedIdx]),
+          });
+        }
+
         async function playSampleTts() {
           const voice = voices.length > 0 ? voices[voiceIdx] : defaults.voice;
           const speed = Number.parseFloat(SPEED_VALUES[speedIdx]);
-          const res = await fetch(`${serverUrl()}/tts`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: "The quick brown fox jumps over the lazy dog.",
-              voice,
-              speed,
-            }),
+          pi.events.emit("voice:speak_start", {
+            text: sampleText,
+            voice,
+            speed,
+            source: "sample",
           });
-          if (!res.ok) {
-            const errData = (await res.json()) as { error: string };
-            throw new Error(errData.error || "Server error");
-          }
-          const wavBuffer = Buffer.from(await res.arrayBuffer());
-          const outPath = join(homedir(), ".pi", "voice-sample.wav");
-          mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
-          writeFileSync(outPath, wavBuffer);
-          const cmd = process.platform === "darwin" ? "afplay" : "aplay";
-          await new Promise<void>((resolve, reject) => {
-            execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
-              if (err) reject(err);
-              else resolve();
+          try {
+            const res = await fetch(`${serverUrl()}/tts`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                text: sampleText,
+                voice,
+                speed,
+              }),
             });
-          });
+            if (!res.ok) {
+              const errData = (await res.json()) as { error: string };
+              throw new Error(errData.error || "Server error");
+            }
+            const wavBuffer = Buffer.from(await res.arrayBuffer());
+            const outPath = join(homedir(), ".pi", "voice-sample.wav");
+            mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
+            writeFileSync(outPath, wavBuffer);
+            const cmd = process.platform === "darwin" ? "afplay" : "aplay";
+            await new Promise<void>((resolve, reject) => {
+              execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+            pi.events.emit("voice:speak_end", { text: sampleText, source: "sample" });
+          } catch (error) {
+            pi.events.emit("voice:speak_end", {
+              text: sampleText,
+              source: "sample",
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
         }
 
         return {
@@ -543,6 +625,7 @@ export default function (pi: ExtensionAPI) {
               enabled = defaults.enabled;
               voiceIdx = voices.length > 0 ? Math.max(0, voices.indexOf(defaults.voice)) : -1;
               speedIdx = speedToIndex(defaults.speed);
+              emitConfig();
               _tui.requestRender();
               return;
             }
@@ -580,6 +663,7 @@ export default function (pi: ExtensionAPI) {
                 saveConfig(defaults);
               }
               persistSession();
+              emitConfig();
               _tui.requestRender();
               return;
             }
@@ -648,7 +732,7 @@ export default function (pi: ExtensionAPI) {
       const voice = params.voice ?? effective.voice;
       const speed = params.speed ?? effective.speed;
 
-      speak(params.text, { ...effective, voice, speed }).catch(() => {
+      speak(params.text, { ...effective, voice, speed }, "tool").catch(() => {
         /* errors already logged inside speak */
       });
 
@@ -660,14 +744,53 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  // ── Status bar ────────────────────────────────────────────────
+
+  function updateStatusBar() {
+    if (!currentCtx) return;
+    const effective = getEffective();
+    const theme = currentCtx.ui.theme;
+    const icon = effective.enabled ? theme.fg("success", "\u266A") : theme.fg("dim", "\u266A");
+    currentCtx.ui.setStatus("pi-voice", icon);
+  }
+
   // ── Session lifecycle ──────────────────────────────────────────
 
   pi.on("session_start", async (_event, ctx) => {
+    currentCtx = ctx;
     restoreSession(ctx);
+    updateStatusBar();
   });
 
   pi.on("session_tree", async (_event, ctx) => {
+    currentCtx = ctx;
     restoreSession(ctx);
+    updateStatusBar();
+  });
+
+  // Update status bar on voice:config events (from TUI, alt+v, etc.)
+  pi.events.on("voice:config", () => {
+    updateStatusBar();
+  });
+
+  // ── Global toggle shortcut (alt+v) ────────────────────────────
+
+  pi.registerShortcut("alt+v", {
+    description: "Toggle TTS on/off",
+    handler: async (ctx) => {
+      const effective = getEffective();
+      const next = !effective.enabled;
+      session.enabled = next;
+      defaults.enabled = next;
+      saveConfig(defaults);
+      persistSession();
+      ctx.ui.notify(`TTS ${next ? "enabled" : "disabled"}`, "info");
+      pi.events.emit("voice:config", {
+        enabled: next,
+        voice: effective.voice,
+        speed: effective.speed,
+      });
+    },
   });
 
   // ── Auto-TTS event handlers ─────────────────────────────────────
