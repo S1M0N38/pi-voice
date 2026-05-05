@@ -340,9 +340,38 @@ export default function (pi: ExtensionAPI) {
     defaults = loadConfig();
   }
 
+  // ── Audio playback queue ────────────────────────────────────────
+
+  // Serializes audio playback so tts tool and auto-TTS never overlap.
+  type QueueItem = {
+    play: () => Promise<void>;
+  };
+
+  let audioQueue: QueueItem[] = [];
+  let audioPlaying = false;
+
+  function drainAudioQueue(): void {
+    if (audioPlaying) return;
+    const item = audioQueue.shift();
+    if (!item) return;
+    audioPlaying = true;
+    item
+      .play()
+      .catch(() => {})
+      .finally(() => {
+        audioPlaying = false;
+        drainAudioQueue();
+      });
+  }
+
+  function enqueueAudio(item: QueueItem): void {
+    audioQueue.push(item);
+    drainAudioQueue();
+  }
+
   // ── Speak + Auto-TTS (closured over pi) ─────────────────────
 
-  // Async speak — fetches TTS audio and plays it in the background.
+  // Queued speak — fetches TTS audio and enqueues it for sequential playback.
   async function speak(
     text: string,
     config: FullVoiceConfig,
@@ -379,20 +408,26 @@ export default function (pi: ExtensionAPI) {
       mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
       writeFileSync(outPath, wavBuffer);
 
-      const cmd = process.platform === "darwin" ? "afplay" : "aplay";
-      execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
-        if (err) console.warn("[pi-voice] Playback error:", err);
-        const endEvent: VoiceSpeakEndEvent = {
-          text,
-          source,
-          ...(err ? { error: err.message } : {}),
-        };
-        pi.events.emit("voice:speak_end", endEvent);
-        try {
-          unlinkSync(outPath);
-        } catch {
-          /* ignore */
-        }
+      enqueueAudio({
+        play: () =>
+          new Promise<void>((resolve) => {
+            const cmd = process.platform === "darwin" ? "afplay" : "aplay";
+            execCb(`${cmd} "${outPath}"`, { timeout: 30_000 }, (err) => {
+              if (err) console.warn("[pi-voice] Playback error:", err);
+              const endEvent: VoiceSpeakEndEvent = {
+                text,
+                source,
+                ...(err ? { error: err.message } : {}),
+              };
+              pi.events.emit("voice:speak_end", endEvent);
+              try {
+                unlinkSync(outPath);
+              } catch {
+                /* ignore */
+              }
+              resolve();
+            });
+          }),
       });
     } catch (error) {
       console.warn("[pi-voice] TTS error:", error);
