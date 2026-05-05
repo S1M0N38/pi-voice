@@ -183,7 +183,17 @@ function loadConfig(): FullVoiceConfig {
   try {
     if (existsSync(CONFIG_PATH)) {
       const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-      return { ...DEFAULT_CONFIG, ...raw };
+      // Do NOT merge with DEFAULT_CONFIG — only what the user has written runs.
+      // If events is missing from user config, no auto-TTS events fire.
+      return {
+        enabled: raw.enabled ?? DEFAULT_CONFIG.enabled,
+        voice: raw.voice ?? DEFAULT_CONFIG.voice,
+        speed: raw.speed ?? DEFAULT_CONFIG.speed,
+        host: raw.host ?? DEFAULT_CONFIG.host,
+        port: raw.port ?? DEFAULT_CONFIG.port,
+        summaryModel: raw.summaryModel,
+        events: raw.events,
+      };
     }
   } catch {
     /* use defaults */
@@ -634,12 +644,15 @@ export default function (pi: ExtensionAPI) {
 
             if (matchesKey(data, "r")) {
               session = {};
+              // Write full defaults (including agent_end event) back to disk
+              saveConfig({ ...DEFAULT_CONFIG });
               defaults = loadConfig();
               persistSession();
               enabled = defaults.enabled;
               voiceIdx = voices.length > 0 ? Math.max(0, voices.indexOf(defaults.voice)) : -1;
               speedIdx = speedToIndex(defaults.speed);
               emitConfig();
+              feedback = "✓ Reset to defaults";
               _tui.requestRender();
               return;
             }
