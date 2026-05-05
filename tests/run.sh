@@ -8,10 +8,10 @@
 #   - pi installed with a working model
 #
 # Usage:
-#   bash test/run.sh              # run all tests
-#   bash test/run.sh tui          # run only TUI test
-#   bash test/run.sh tts-tool     # run only tts tool test
-#   bash test/run.sh auto-tts     # run only auto-TTS test
+#   bash tests/run.sh              # run all tests
+#   bash tests/run.sh tui          # run only TUI test
+#   bash tests/run.sh tts-tool     # run only tts tool test
+#   bash tests/run.sh auto-tts     # run only auto-TTS test
 
 set -euo pipefail
 
