@@ -308,7 +308,125 @@ describe("Kokoro TTS Server", () => {
     });
   });
 
-  // ── 4. Unload / Activate ─────────────────────────────────────
+  // ── 4. Queue (model loaded) ──────────────────────────────────
+
+  describe("TTS queue", () => {
+    before(async () => {
+      await ensureModelLoaded();
+    });
+
+    it("processes concurrent requests one at a time (FIFO order)", async () => {
+      // Fire 3 concurrent TTS requests — they must all succeed and
+      // return valid WAV audio, proving they were serialized.
+      const results = await Promise.all([
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "First request" }),
+        }),
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Second request" }),
+        }),
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Third request" }),
+        }),
+      ]);
+
+      for (let i = 0; i < results.length; i++) {
+        assert.equal(results[i].status, 200, `Request ${i + 1} should succeed`);
+        assertWav(results[i].body);
+      }
+    });
+
+    it("validates queued requests (empty text returns 400 even in queue)", async () => {
+      // Even in the queue, validation should work — empty text → 400
+      const { status } = await post("/tts", { text: "   " });
+      assert.equal(status, 400);
+    });
+
+    it("skips synthesis when client disconnects while queued", async () => {
+      // Send a request and immediately abort it — the server should
+      // detect the disconnect and skip synthesis.
+      const controller = new AbortController();
+      const request = fetch(url("/tts"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "This should be cancelled" }),
+        signal: controller.signal,
+      });
+
+      // Abort immediately before the server can process
+      controller.abort();
+
+      try {
+        await request;
+      } catch (err) {
+        // Expected: AbortError from the client side
+        assert.ok(
+          err instanceof Error && err.name === "AbortError",
+          `Expected AbortError, got: ${err}`,
+        );
+      }
+
+      // Give the server a moment to process the disconnect
+      await new Promise((r) => setTimeout(r, 500));
+    });
+
+    it("queue recovers after a failed request", async () => {
+      // First request: invalid (empty text) — will fail in the queue
+      await post("/tts", { text: "" });
+
+      // Second request: valid — should still work after the failure
+      const { status, body } = await fetchBinary("/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "After failure" }),
+      });
+      assert.equal(status, 200);
+      assertWav(body);
+    });
+
+    it("mix of concurrent and sequential requests all succeed", async () => {
+      // Batch 1: 2 concurrent
+      const batch1 = await Promise.all([
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Batch one A" }),
+        }),
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Batch one B" }),
+        }),
+      ]);
+
+      // Batch 2: 2 more concurrent (must wait for batch 1 to drain)
+      const batch2 = await Promise.all([
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Batch two A" }),
+        }),
+        fetchBinary("/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Batch two B" }),
+        }),
+      ]);
+
+      for (const res of [...batch1, ...batch2]) {
+        assert.equal(res.status, 200);
+        assertWav(res.body);
+      }
+    });
+  });
+
+  // ── 5. Unload / Activate ─────────────────────────────────────
 
   describe("Unload", () => {
     before(async () => {

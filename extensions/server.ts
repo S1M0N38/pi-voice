@@ -396,44 +396,96 @@ async function handleModelsUnload(_req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+// ── TTS request queue (serializes /tts calls — one synthesis at a time) ────
+let ttsQueueTail: Promise<void> = Promise.resolve();
+let ttsQueueDepth = 0;
+
+function enqueueTTS<T>(label: string, req: IncomingMessage, res: ServerResponse, fn: () => Promise<T>): Promise<T> {
+  ttsQueueDepth++;
+  const depth = ttsQueueDepth;
+  console.log(`[pi-voice] Queue: enqueued "${label}" (depth=${depth})`);
+
+  // Track real client disconnect via the response close event.
+  // Note: req.destroyed is always true after readBody() consumes the stream,
+  // so it cannot be used to detect actual disconnects.
+  let disconnected = false;
+  const onClose = () => { disconnected = true; };
+  res.on("close", onClose);
+
+  return new Promise<T>((resolve, reject) => {
+    ttsQueueTail = ttsQueueTail.then(async () => {
+      ttsQueueDepth--;
+      res.removeListener("close", onClose);
+
+      // Client disconnected while waiting — skip synthesis
+      if (disconnected) {
+        console.log(`[pi-voice] Queue: skipping "${label}" (client disconnected)`);
+        reject(new Error("Client disconnected"));
+        return;
+      }
+
+      console.log(`[pi-voice] Queue: processing "${label}"`);
+      try {
+        resolve(await fn());
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 async function handleTTS(req: IncomingMessage, res: ServerResponse) {
   try {
-    if (!tts || !activeDtype) {
-      json(res, { error: "No model loaded. Download and activate a model first." }, 503);
-      return;
-    }
-
-    const body = JSON.parse(await readBody(req));
+    // Read the body outside the queue so the request is fully consumed
+    // before entering the queue (avoids hanging on slow clients).
+    const rawBody = await readBody(req);
+    const body = JSON.parse(rawBody);
     const text = (body.text as string | undefined)?.trim();
+    const label = text ? `"${text.slice(0, 40)}${text.length > 40 ? "..." : ""}"` : "(empty)";
 
-    if (!text) {
-      json(res, { error: "Missing or empty 'text' field" }, 400);
+    const result = await enqueueTTS(label, req, res, async () => {
+      if (!tts || !activeDtype) {
+        return { error: "No model loaded. Download and activate a model first.", status: 503 } as const;
+      }
+
+      if (!text) {
+        return { error: "Missing or empty 'text' field", status: 400 } as const;
+      }
+
+      const voice = (body.voice as string) || "af_heart";
+      const speed = Number(body.speed ?? 1.0);
+
+      console.log(
+        `[pi-voice] Synthesizing: "${text.slice(0, 60)}${text.length > 60 ? "..." : ""}" (voice=${voice}, speed=${speed}, dtype=${activeDtype})`,
+      );
+
+      const audio = await tts.generate(text, {
+        voice: voice as keyof typeof tts.voices,
+        speed,
+      });
+      const samples = audio.audio as Float32Array;
+      const sampleRate = audio.sampling_rate;
+      return { wav: float32ToWav(samples, sampleRate) } as const;
+    });
+
+    if ("error" in result) {
+      json(res, { error: result.error }, result.status);
+    } else {
+      res.writeHead(200, {
+        "Content-Type": "audio/wav",
+        "Content-Length": result.wav.length,
+      });
+      res.end(result.wav);
+    }
+  } catch (err) {
+    // Don't log client disconnect as an error — it's expected behavior
+    if (err instanceof Error && err.message === "Client disconnected") {
       return;
     }
-
-    const voice = (body.voice as string) || "af_heart";
-    const speed = Number(body.speed ?? 1.0);
-
-    console.log(
-      `[pi-voice] Synthesizing: "${text.slice(0, 60)}${text.length > 60 ? "..." : ""}" (voice=${voice}, speed=${speed}, dtype=${activeDtype})`,
-    );
-
-    const audio = await tts.generate(text, {
-      voice: voice as keyof typeof tts.voices,
-      speed,
-    });
-    const samples = audio.audio as Float32Array;
-    const sampleRate = audio.sampling_rate;
-    const wavBuffer = float32ToWav(samples, sampleRate);
-
-    res.writeHead(200, {
-      "Content-Type": "audio/wav",
-      "Content-Length": wavBuffer.length,
-    });
-    res.end(wavBuffer);
-  } catch (err) {
     console.error("[pi-voice] TTS error:", err);
-    json(res, { error: err instanceof Error ? err.message : String(err) }, 500);
+    if (!res.headersSent) {
+      json(res, { error: err instanceof Error ? err.message : String(err) }, 500);
+    }
   }
 }
 
