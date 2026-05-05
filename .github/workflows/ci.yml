@@ -23,3 +23,25 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: huggingface-models-${{ runner.os }}-q4
+          restore-keys: |
+            huggingface-models-${{ runner.os }}-
+
+      - name: Server integration tests
+        run: npm test
