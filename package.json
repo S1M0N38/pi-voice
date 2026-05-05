@@ -1,6 +1,6 @@
 {
   "name": "pi-voice",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "HTTP server for Kokoro TTS — text-to-speech via ONNX inference.",
   "type": "module",
   "license": "MIT",
