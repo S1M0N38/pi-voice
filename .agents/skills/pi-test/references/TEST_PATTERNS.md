@@ -1,447 +1,271 @@
-# Pi TUI Test Patterns
+# Pi-voice E2E Test Patterns
 
-Ready-to-use test scripts for common pi TUI component patterns. Copy and adapt these scripts to test your components.
+Ready-to-use patterns for testing pi-voice components with pilotty.
+Adapted from the generic pi-tui patterns to match pi-voice's actual test suite.
 
 ## Table of Contents
 
-1. [SelectList Dialog Test](#1-selectlist-dialog-test)
-2. [Overlay Test](#2-overlay-test)
-3. [SettingsList Toggle Test](#3-settingslist-toggle-test)
-4. [Custom Editor Test](#4-custom-editor-test)
-5. [Widget Test](#5-widget-test)
-6. [BorderedLoader Test](#6-borderedloader-test)
+1. [Settings Toggle Test](#1-settings-toggle-test)
+2. [Agent Tool Invocation Test](#2-agent-tool-invocation-test)
+3. [Event Handler Request Counting Test](#3-event-handler-request-counting-test)
+4. [Config Persistence Test](#4-config-persistence-test)
+5. [Wrap-around Navigation Test](#5-wrap-around-navigation-test)
 
 ---
 
-## 1. SelectList Dialog Test
+## 1. Settings Toggle Test
 
-Tests a SelectList component invoked via a slash command. Verifies:
-- Dialog renders with title
-- Items appear in the list
-- Navigation works (up/down)
-- Selection highlights correctly
-- Enter selects and closes
-- Escape cancels
+Tests the /voice TUI toggle (TTS on/off). Pattern used in `tests/tui.sh`.
 
 ```bash
 #!/bin/bash
-# Test: SelectList Dialog
-# Prerequisites: Package has a /pick command that shows a SelectList
+# Prerequisites: TTS server running with model loaded
+source "$(dirname "$0")/helpers.sh"
+require_server
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="selectlist-test"
+spawn_pi
+wait_for_pi
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
+# Open /voice
+HASH=$(snapshot_content_hash)
+send_type "/voice"
+send_key Enter
+TEXT=$(await_change_and_snapshot_text "$HASH" 500 5000)
 
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
+# Verify initial state
+assert_match "TTS shows on" "on" "$TEXT"
 
-echo "=== Step 3: Trigger the SelectList dialog ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/pick"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
+# Toggle off with ←
+HASH=$(snapshot_content_hash)
+send_key Left
+TEXT=$(await_change_and_snapshot_text "$HASH" 50)
+assert_match "TTS now off" "off" "$TEXT"
 
-echo "=== Step 4: Verify dialog rendered ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Pick an Option" && echo "✓ Title found"
+# Toggle back on with →
+HASH=$(snapshot_content_hash)
+send_key Right
+TEXT=$(await_change_and_snapshot_text "$HASH" 50)
+assert_match "TTS back on" "on" "$TEXT"
 
-echo "=== Step 5: Check for list items ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Option 1" && echo "✓ Option 1 found"
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Option 2" && echo "✓ Option 2 found"
-
-echo "=== Step 6: Navigate down ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Down
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Navigation down worked"
-
-echo "=== Step 7: Navigate up ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Up
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Navigation up worked"
-
-echo "=== Step 8: Select an item with Enter ==="
-PRE_TEXT=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.text')
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-POST_TEXT=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.text')
-
-echo "$POST_TEXT" | grep -v -q "Pick an Option" && echo "✓ Dialog closed on selection"
-
-echo "=== Step 9: Verify notification appeared ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Selected:" && echo "✓ Selection notification found"
-
-echo "=== Step 10: Re-open and test cancel with Escape ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/pick"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100
-
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Escape
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -v -q "Selected:" && echo "✓ Dialog closed on cancel"
-
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
+send_key Escape
+kill_session
+print_summary
 ```
 
 ---
 
-## 2. Overlay Test
+## 2. Agent Tool Invocation Test
 
-Tests an overlay component. Verifies:
-- Overlay appears over existing content
-- Overlay content renders
-- Interaction works inside overlay
-- Overlay dismisses cleanly
+Tests that the agent can invoke the `tts` tool. Pattern used in `tests/tts-tool.sh`.
 
 ```bash
 #!/bin/bash
-# Test: Overlay Component
-# Prerequisites: Package has a /overlay command that shows an overlay
+# Prerequisites: TTS server running with model loaded, pi has a working model
+source "$(dirname "$0")/helpers.sh"
+require_server
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="overlay-test"
+# Clean up old WAV files
+rm -f "$HOME/.pi"/voice-*.wav 2>/dev/null || true
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
+spawn_pi
+wait_for_pi
 
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
+# Ask the agent to use the tts tool
+HASH=$(snapshot_content_hash)
+send_type "Use the tts tool to say 'hello world test'"
+send_key Enter
 
-echo "=== Step 3: Capture baseline snapshot ==="
-BASELINE_HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-BASELINE_TEXT=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.text')
+# Wait for agent to complete (long settle for agent loop)
+pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 3000 -t 60000 > /dev/null 2>&1
 
-echo "=== Step 4: Trigger the overlay ==="
-pilotty type -s "$SESSION_NAME" "/overlay"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$BASELINE_HASH" --settle 100 -t 5000
+TEXT=$(snapshot_text)
+assert_match "Agent mentions speech" "Speaking\|tts\|audio\|speech" "$TEXT"
 
-echo "=== Step 5: Verify overlay appears ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Overlay Title" && echo "✓ Overlay title found"
-
-echo "=== Step 6: Verify underlying content is still present ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "[Skills]" && echo "✓ Baseline content still visible"
-
-echo "=== Step 7: Interact with overlay ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "test input"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Overlay interaction worked"
-
-echo "=== Step 8: Dismiss overlay ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Escape
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-echo "=== Step 9: Verify screen returned to baseline ==="
-RECOVERY_HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-if [ "$RECOVERY_HASH" = "$BASELINE_HASH" ]; then
-  echo "✓ Screen returned to baseline state"
+# Verify WAV file was created
+WAV_FILE=$(find "$HOME/.pi" -name 'voice-*.wav' -newer "$HOME/.pi/voice.json" 2>/dev/null | head -1)
+if [ -n "$WAV_FILE" ]; then
+  HEADER=$(xxd -l 4 "$WAV_FILE" | awk '{print $2 $3}')
+  [ "$HEADER" = "52494646" ] && log_pass "Valid WAV (RIFF header)"
+  FILE_SIZE=$(stat -f%z "$WAV_FILE" 2>/dev/null || stat -c%s "$WAV_FILE")
+  [ "$FILE_SIZE" -gt 1000 ] && log_pass "WAV size reasonable ($FILE_SIZE bytes)"
 else
-  echo "⚠ Screen state differs from baseline (may be expected if overlay left artifacts)"
+  log_warn "No WAV found (speak() deletes after playback — expected)"
 fi
 
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
+kill_session
+print_summary
 ```
 
 ---
 
-## 3. SettingsList Toggle Test
+## 3. Event Handler Request Counting Test
 
-Tests a SettingsList component with toggle settings. Verifies:
-- All settings appear
-- Navigation works
-- Toggle state changes on Enter
-- Multiple toggles work correctly
+Tests that auto-TTS fires exactly once per event. Uses a counting HTTP proxy. Pattern from `tests/auto-tts.sh`.
 
 ```bash
 #!/bin/bash
-# Test: SettingsList Toggle
-# Prerequisites: Package has a /settings command with a SettingsList
+# Prerequisites: TTS server running with model loaded, pi has a working model
+source "$(dirname "$0")/helpers.sh"
+require_server
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="settings-test"
+# Set up counting proxy
+PROXY_PORT=18181
+COUNT_FILE="/tmp/pi-voice-tts-count-$$"
+echo "0" > "$COUNT_FILE"
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
+# Spawn a tiny proxy that forwards to the real server and counts POST /tts
+PROXY_SCRIPT='
+import http from "node:http";
+import { writeFileSync } from "node:fs";
+let count = 0;
+const server = http.createServer(async (req, res) => {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  const body = Buffer.concat(chunks).toString();
+  if (req.method === "POST" && req.url === "/tts") {
+    count++;
+    writeFileSync(process.env.COUNT_FILE, String(count));
+  }
+  const url = new URL(req.url, process.env.BACKEND);
+  const resp = await fetch(url.toString(), {
+    method: req.method, headers: { ...req.headers, host: url.host },
+    body: req.method !== "GET" ? body : undefined,
+  });
+  const respBody = Buffer.from(await resp.arrayBuffer());
+  const h = {}; resp.headers.forEach((v, k) => { h[k] = v; });
+  delete h["transfer-encoding"]; delete h["content-encoding"];
+  res.writeHead(resp.status, h); res.end(respBody);
+});
+server.listen(process.env.PROXY_PORT, "127.0.0.1");
+'
+PROXY_PORT=$PROXY_PORT COUNT_FILE="$COUNT_FILE" BACKEND="http://127.0.0.1:8181" \
+  node --input-type=module --eval "$PROXY_SCRIPT" &
+PROXY_PID=$!
+sleep 2  # wait for proxy to start
 
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
+# Configure pi-voice to use proxy
+echo "{\"enabled\":true,\"voice\":\"af_heart\",\"speed\":1.0,\"host\":\"127.0.0.1\",\"port\":$PROXY_PORT,\"events\":{\"agent_end\":{\"prompt\":\"Summarize in one sentence.\"}}}" > "$HOME/.pi/voice.json"
 
-echo "=== Step 3: Trigger settings dialog ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/settings"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
+spawn_pi
+wait_for_pi
 
-echo "=== Step 4: Verify all settings appear ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Verbose mode" && echo "✓ 'Verbose mode' setting found"
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Color output" && echo "✓ 'Color output' setting found"
+# Trigger agent
+HASH=$(snapshot_content_hash)
+send_type "What is 2+2? Reply in one short sentence."
+send_key Enter
+pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 3000 -t 90000 > /dev/null 2>&1
+sleep 10  # wait for async auto-TTS handler
 
-echo "=== Step 5: Capture initial state of first setting ==="
-INITIAL_STATE=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep "Verbose mode" | grep -o 'on\|off')
-echo "Initial 'Verbose mode' state: $INITIAL_STATE"
+TTS_COUNT=$(cat "$COUNT_FILE")
+assert_equals "Exactly 1 TTS request" "1" "$TTS_COUNT"
 
-echo "=== Step 6: Toggle first setting ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100
-
-echo "=== Step 7: Verify state changed ==="
-NEW_STATE=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep "Verbose mode" | grep -o 'on\|off')
-if [ "$INITIAL_STATE" != "$NEW_STATE" ]; then
-  echo "✓ Toggle worked: changed from $INITIAL_STATE to $NEW_STATE"
-else
-  echo "✗ Toggle failed: state unchanged"
-fi
-
-echo "=== Step 8: Navigate to second setting ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Down
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-
-echo "=== Step 9: Toggle second setting ==="
-HASH2=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH2" --settle 100
-echo "✓ Second setting toggled"
-
-echo "=== Step 10: Close settings ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Escape
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
+kill_session
+kill "$PROXY_PID" 2>/dev/null
+rm -f "$COUNT_FILE"
+print_summary
 ```
 
 ---
 
-## 4. Custom Editor Test
+## 4. Config Persistence Test
 
-Tests a custom editor replacement. Verifies:
-- Editor renders in custom mode
-- Mode switching works
-- Input handling is correct
-- Escape switches to normal mode
-- Navigation keys work in normal mode
+Tests that settings survive closing and reopening /voice. Pattern from `tests/tui.sh` test #18.
 
 ```bash
 #!/bin/bash
-# Test: Custom Editor (Vim-like mode switching)
-# Prerequisites: Package sets a custom editor that supports insert/normal modes
+source "$(dirname "$0")/helpers.sh"
+require_server
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="editor-test"
+# Set known config
+echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice.json"
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
+spawn_pi
+wait_for_pi
 
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
+# Open /voice, change voice
+HASH=$(snapshot_content_hash)
+send_type "/voice"
+send_key Enter
+await_change_and_snapshot_text "$HASH" 500 5000 > /dev/null
 
-echo "=== Step 3: Verify custom mode indicator ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "INSERT" && echo "✓ Insert mode indicator found"
+send_key Down        # → Voice row
+HASH=$(snapshot_content_hash)
+send_key Right       # cycle to next voice
+await_change_and_snapshot_text "$HASH" 50 > /dev/null
 
-echo "=== Step 4: Type some text in insert mode ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "Hello world"
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Text input worked in insert mode"
+# Close
+send_key Escape
+sleep 0.3
 
-echo "=== Step 5: Verify text appears ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Hello world" && echo "✓ Text found on screen"
+# Re-open and verify change persisted
+HASH=$(snapshot_content_hash)
+send_type "/voice"
+send_key Enter
+TEXT=$(await_change_and_snapshot_text "$HASH" 500 5000)
 
-echo "=== Step 6: Press Escape to switch to normal mode ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Escape
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
+assert_no_match "Voice not af_heart (was changed)" "af_heart" "$(echo "$TEXT" | grep '→ Voice')"
 
-echo "=== Step 7: Verify mode indicator changed ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "NORMAL" && echo "✓ Normal mode indicator found"
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -v -q "INSERT" && echo "✓ Insert mode indicator gone"
-
-echo "=== Step 8: Test navigation keys in normal mode ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" h
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Left navigation worked"
-
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" l
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-echo "✓ Right navigation worked"
-
-echo "=== Step 9: Switch back to insert mode (i key) ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" i
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 50
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "INSERT" && echo "✓ Returned to insert mode"
-
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
+send_key Escape
+kill_session
+print_summary
 ```
 
 ---
 
-## 5. Widget Test
+## 5. Wrap-around Navigation Test
 
-Tests a widget that appears above or below the editor. Verifies:
-- Widget content renders
-- Widget persists across normal typing
-- Widget disappears when cleared
+Tests that cursor wraps from last→first and first→last row. Pattern from `tests/tui.sh` tests #13-14.
 
 ```bash
 #!/bin/bash
-# Test: Widget (Todo list / Progress indicator)
-# Prerequisites: Package has a /widget command that sets a widget
+source "$(dirname "$0")/helpers.sh"
+require_server
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="widget-test"
+echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice.json"
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
+spawn_pi
+wait_for_pi
 
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
+HASH=$(snapshot_content_hash)
+send_type "/voice"
+send_key Enter
+await_change_and_snapshot_text "$HASH" 500 5000 > /dev/null
 
-echo "=== Step 3: Trigger widget ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/widget"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
+# Navigate to last row (Speed)
+send_key Down && send_key Down
+TEXT=$(snapshot_text)
+assert_match "On Speed row" "→ Speed" "$TEXT"
 
-echo "=== Step 4: Verify widget appears ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Todo" && echo "✓ Widget content found"
+# Down from last wraps to first (TTS)
+HASH=$(snapshot_content_hash)
+send_key Down
+TEXT=$(await_change_and_snapshot_text "$HASH" 50)
+assert_match "Wrapped to TTS row" "→ TTS" "$TEXT"
 
-echo "=== Step 5: Type normally and verify widget persists ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "typing while widget is visible"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100
+# Up from first wraps to last (Speed)
+HASH=$(snapshot_content_hash)
+send_key Up
+TEXT=$(await_change_and_snapshot_text "$HASH" 50)
+assert_match "Wrapped to Speed row" "→ Speed" "$TEXT"
 
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Todo" && echo "✓ Widget persisted after typing"
-
-echo "=== Step 6: Clear widget ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/widget-clear"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100
-
-echo "=== Step 7: Verify widget disappeared ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -v -q "Todo" && echo "✓ Widget cleared"
-
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
+send_key Escape
+kill_session
+print_summary
 ```
 
 ---
 
-## 6. BorderedLoader Test
-
-Tests a loading overlay with cancel capability. Verifies:
-- Loader overlay appears
-- Spinner indicator shows
-- Cancel (Escape) works
-- Loader closes on completion
+## Running Tests
 
 ```bash
-#!/bin/bash
-# Test: BorderedLoader with Async Operation
-# Prerequisites: Package has a /fetch command that shows a loader during async work
+# Individual suites
+npm run test:tui           # /voice TUI interaction tests
+npm run test:tts-tool      # tts tool invocation tests
+npm run test:auto-tts      # auto-TTS event handler tests
 
-PACKAGE_DIR="/path/to/your/package"
-SESSION_NAME="loader-test"
+# All E2E tests
+npm run test:e2e
 
-echo "=== Step 1: Spawn pi with package loaded ==="
-pilotty spawn --name "$SESSION_NAME" --cwd "$PACKAGE_DIR" -- pi -ne -e . --no-session
-
-echo "=== Step 2: Wait for pi to be ready ==="
-pilotty wait-for -s "$SESSION_NAME" "[Skills]" -t 10000
-
-echo "=== Step 3: Trigger async operation with loader ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/fetch"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-echo "=== Step 4: Verify loader appears ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Fetching" && echo "✓ Loader text found"
-
-echo "=== Step 5: Wait a moment for spinner to animate ==="
-sleep 2
-echo "✓ Loader remains visible during operation"
-
-echo "=== Step 6: Test cancel (optional - if operation is cancellable) ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty key -s "$SESSION_NAME" Escape
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-echo "=== Step 7: Verify loader closed ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -v -q "Fetching" && echo "✓ Loader dismissed"
-
-echo "=== Step 8: Test normal completion (run a fresh fetch) ==="
-HASH=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty type -s "$SESSION_NAME" "/fetch"
-pilotty key -s "$SESSION_NAME" Enter
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH" --settle 100 -t 5000
-
-echo "=== Step 9: Wait for completion (adjust timeout based on operation) ==="
-HASH2=$(pilotty snapshot -s "$SESSION_NAME" | jq -r '.content_hash')
-pilotty snapshot -s "$SESSION_NAME" --await-change "$HASH2" --settle 100 -t 15000
-
-echo "=== Step 10: Verify result appears ==="
-pilotty snapshot -s "$SESSION_NAME" | jq -r '.text' | grep -q "Done\|Complete\|Cancelled" && echo "✓ Completion state found"
-
-echo "=== Cleanup ==="
-pilotty kill -s "$SESSION_NAME"
-
-echo "=== Test Complete ==="
-```
-
----
-
-## Running These Tests
-
-Save each test script as a `.sh` file, make it executable, and run:
-
-```bash
-chmod +x test-selectlist.sh
-./test-selectlist.sh
-```
-
-For debugging, add `--format text` to snapshot commands to see visual output:
-
-```bash
+# Debug a specific test with visual output
 pilotty snapshot -s "$SESSION_NAME" --format text
-```
-
-For automated CI, check exit codes and capture logs:
-
-```bash
-./test-selectlist.sh > test-results.log 2>&1
-if [ $? -eq 0 ]; then
-  echo "✓ All tests passed"
-else
-  echo "✗ Tests failed - check test-results.log"
-fi
 ```
