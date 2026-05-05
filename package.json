@@ -40,6 +40,7 @@
     "test": "node --import jiti extensions/server.test.ts",
     "test:tui": "bash tests/tui.sh",
     "test:toggle": "bash tests/toggle.sh",
+    "test:queue": "bash tests/queue.sh",
     "test:e2e": "bash tests/run.sh",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

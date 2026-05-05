@@ -25,7 +25,7 @@ RESET='\033[0m'
 # Select tests
 TESTS=( "$@" )
 if [ ${#TESTS[@]} -eq 0 ]; then
-  TESTS=(tui toggle)
+  TESTS=(tui toggle queue)
 fi
 
 TOTAL_PASSED=0
