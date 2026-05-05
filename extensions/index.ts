@@ -214,6 +214,7 @@ function saveConfig(config: FullVoiceConfig) {
  * Handles both single-message events (turn_end, message_end)
  * and multi-message events (agent_end).
  */
+// biome-ignore lint/suspicious/noExplicitAny: event shape varies by event type
 function extractLastMessage(event: any): string {
   // agent_end has event.messages (array)
   if (event.messages && Array.isArray(event.messages) && event.messages.length > 0) {
@@ -224,12 +225,16 @@ function extractLastMessage(event: any): string {
   return extractTextContent(event.message?.content);
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: content items have varying shapes
 function extractTextContent(content: any[] | undefined): string {
   if (!content) return "";
-  return content
-    .filter((c: any): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("\n");
+  return (
+    content
+      // biome-ignore lint/suspicious/noExplicitAny: type guard filters unknown content items
+      .filter((c: any): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("\n")
+  );
 }
 
 // ── Event Processing ───────────────────────────────────────────────
@@ -347,7 +352,7 @@ export default function (pi: ExtensionAPI) {
     play: () => Promise<void>;
   };
 
-  let audioQueue: QueueItem[] = [];
+  const audioQueue: QueueItem[] = [];
   let audioPlaying = false;
 
   function drainAudioQueue(): void {
@@ -442,6 +447,7 @@ export default function (pi: ExtensionAPI) {
 
   async function handleAutoTTS(
     eventName: string,
+    // biome-ignore lint/suspicious/noExplicitAny: event shape varies by event type
     event: any,
     ctx: ExtensionContext,
     config: FullVoiceConfig,

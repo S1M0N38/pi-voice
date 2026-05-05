@@ -29,7 +29,7 @@ const KEY_ESCAPE = "\x1b";
 const KEY_ENTER = "\r";
 const KEY_LEFT = "\x1b[D";
 const KEY_RIGHT = "\x1b[C";
-const KEY_UP = "\x1b[A";
+const _KEY_UP = "\x1b[A";
 const KEY_DOWN = "\x1b[B";
 const KEY_R = "r";
 
@@ -140,9 +140,13 @@ function createValidWav(): ArrayBuffer {
 // ── Mock infrastructure ────────────────────────────────────────────
 
 /** Registered commands, tools, shortcuts, event handlers. */
+// biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
 let commands: Record<string, { handler: (...args: any[]) => Promise<any> }>;
+// biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
 let tools: Record<string, { execute: (...args: any[]) => Promise<any> }>;
+// biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
 let shortcuts: Record<string, { handler: (ctx: any) => Promise<void> }>;
+// biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
 let piEventHandlers: Record<string, (...args: any[]) => Promise<void>>;
 
 /** Captured TUI component from /voice command. */
@@ -182,15 +186,19 @@ function createMockPi() {
         return () => {};
       },
     },
+    // biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
     registerCommand(name: string, config: { handler: (...args: any[]) => Promise<any> }) {
       commands[name] = config;
     },
     registerTool(config: Record<string, unknown>) {
+      // biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
       tools[config.name as string] = config as any;
     },
+    // biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
     registerShortcut(key: string, config: { handler: (ctx: any) => Promise<void> }) {
       shortcuts[key] = config;
     },
+    // biome-ignore lint/suspicious/noExplicitAny: mock infrastructure uses flexible any types
     on(event: string, handler: (...args: any[]) => Promise<void>) {
       piEventHandlers[event] = handler;
     },
@@ -213,6 +221,7 @@ function mockFetch(responses?: {
   const voicesResponse = responses?.voices ?? ["af_heart", "af_alloy", "bf_emma"];
   const ttsOk = responses?.ttsOk ?? true;
 
+  // biome-ignore lint/suspicious/noExplicitAny: mock fetch accepts any input
   globalThis.fetch = (async (input: any) => {
     const url = typeof input === "string" ? input : input.url;
 
@@ -248,6 +257,7 @@ function mockFetch(responses?: {
 function createMockCtx(overrides: Record<string, unknown> = {}) {
   return {
     ui: {
+      // biome-ignore lint/suspicious/noExplicitAny: mock factory is intentionally any
       async custom(factory: any) {
         tuiPromise = new Promise((resolve) => {
           tuiDone = resolve;
@@ -273,7 +283,9 @@ function createMockCtx(overrides: Record<string, unknown> = {}) {
 }
 
 /** Helper: filter emitted events by name for a specific mock pi. */
+// biome-ignore lint/suspicious/noExplicitAny: mock pi is intentionally any
 function getEvents(pi: any, name: string): Array<{ event: string; data: unknown }> {
+  // biome-ignore lint/suspicious/noExplicitAny: filter callback uses any for flexibility
   return pi._emitted.filter((e: any) => e.event === name);
 }
 
@@ -299,6 +311,7 @@ describe("pi-voice event system", () => {
   describe("voice:config", () => {
     it("emits when TTS is toggled via /voice TUI", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -320,6 +333,7 @@ describe("pi-voice event system", () => {
 
     it("emits when voice is changed via /voice TUI", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -337,6 +351,7 @@ describe("pi-voice event system", () => {
 
     it("emits when speed is changed via /voice TUI", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -355,6 +370,7 @@ describe("pi-voice event system", () => {
 
     it("emits when settings are reset via /voice TUI", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -375,6 +391,7 @@ describe("pi-voice event system", () => {
   describe("alt+v keybind", () => {
     it("emits voice:config when toggling TTS", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await shortcuts["alt+v"].handler(createMockCtx());
@@ -390,6 +407,7 @@ describe("pi-voice event system", () => {
 
     it("toggles enabled state (on → off → on)", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await shortcuts["alt+v"].handler(createMockCtx());
@@ -403,6 +421,7 @@ describe("pi-voice event system", () => {
 
     it("persists toggle to config file", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await shortcuts["alt+v"].handler(createMockCtx());
@@ -413,6 +432,7 @@ describe("pi-voice event system", () => {
 
     it("voice:config payload has exactly { enabled, voice, speed }", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await shortcuts["alt+v"].handler(createMockCtx());
@@ -428,6 +448,7 @@ describe("pi-voice event system", () => {
   describe("voice:speak_start", () => {
     it("emits with source: tool when tts tool is invoked", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Hello" }, undefined, undefined, createMockCtx());
@@ -446,6 +467,7 @@ describe("pi-voice event system", () => {
     it("does NOT emit speak_start when TTS is disabled", async () => {
       writeTestConfig({ enabled: false });
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Muted" }, undefined, undefined, createMockCtx());
@@ -457,6 +479,7 @@ describe("pi-voice event system", () => {
 
     it("emits with source: sample for TUI playSampleTts", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -476,6 +499,7 @@ describe("pi-voice event system", () => {
 
     it("payload matches VoiceSpeakStartEvent interface", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Check" }, undefined, undefined, createMockCtx());
@@ -492,6 +516,7 @@ describe("pi-voice event system", () => {
   describe("voice:speak_end", () => {
     it("emits after successful playback with no error field", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Works" }, undefined, undefined, createMockCtx());
@@ -512,6 +537,7 @@ describe("pi-voice event system", () => {
       mockFetch({ ttsOk: false });
 
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Fails" }, undefined, undefined, createMockCtx());
@@ -528,6 +554,7 @@ describe("pi-voice event system", () => {
 
     it("payload has text + source at minimum", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Shape" }, undefined, undefined, createMockCtx());
@@ -544,6 +571,7 @@ describe("pi-voice event system", () => {
   describe("source field", () => {
     it('"tool" from tts tool', async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Src" }, undefined, undefined, createMockCtx());
@@ -557,6 +585,7 @@ describe("pi-voice event system", () => {
 
     it('"sample" from TUI playSampleTts', async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       const handlerPromise = commands.voice.handler([], createMockCtx());
@@ -581,6 +610,7 @@ describe("pi-voice event system", () => {
   describe("speak_start / speak_end pairing", () => {
     it("every speak_start has a corresponding speak_end", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
       await tools.tts.execute("tc_1", { text: "Pair" }, undefined, undefined, createMockCtx());
@@ -597,9 +627,10 @@ describe("pi-voice event system", () => {
   describe("auto-TTS without model", () => {
     it("does not emit speak events when no model is available", async () => {
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
-      const handler = piEventHandlers["agent_end"];
+      const handler = piEventHandlers.agent_end;
       assert.ok(handler, "agent_end handler should be registered");
 
       await handler(
@@ -630,9 +661,10 @@ describe("pi-voice event system", () => {
     it("does not emit speak events when TTS is disabled", async () => {
       writeTestConfig({ enabled: false });
       const pi = createMockPi();
+      // biome-ignore lint/suspicious/noExplicitAny: mock pi cast
       extensionFactory(pi as any);
 
-      const handler = piEventHandlers["agent_end"];
+      const handler = piEventHandlers.agent_end;
       assert.ok(handler);
 
       await handler(

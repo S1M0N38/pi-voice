@@ -400,7 +400,12 @@ async function handleModelsUnload(_req: IncomingMessage, res: ServerResponse) {
 let ttsQueueTail: Promise<void> = Promise.resolve();
 let ttsQueueDepth = 0;
 
-function enqueueTTS<T>(label: string, req: IncomingMessage, res: ServerResponse, fn: () => Promise<T>): Promise<T> {
+function enqueueTTS<T>(
+  label: string,
+  _req: IncomingMessage,
+  res: ServerResponse,
+  fn: () => Promise<T>,
+): Promise<T> {
   ttsQueueDepth++;
   const depth = ttsQueueDepth;
   console.log(`[pi-voice] Queue: enqueued "${label}" (depth=${depth})`);
@@ -409,7 +414,9 @@ function enqueueTTS<T>(label: string, req: IncomingMessage, res: ServerResponse,
   // Note: req.destroyed is always true after readBody() consumes the stream,
   // so it cannot be used to detect actual disconnects.
   let disconnected = false;
-  const onClose = () => { disconnected = true; };
+  const onClose = () => {
+    disconnected = true;
+  };
   res.on("close", onClose);
 
   return new Promise<T>((resolve, reject) => {
@@ -445,7 +452,10 @@ async function handleTTS(req: IncomingMessage, res: ServerResponse) {
 
     const result = await enqueueTTS(label, req, res, async () => {
       if (!tts || !activeDtype) {
-        return { error: "No model loaded. Download and activate a model first.", status: 503 } as const;
+        return {
+          error: "No model loaded. Download and activate a model first.",
+          status: 503,
+        } as const;
       }
 
       if (!text) {
