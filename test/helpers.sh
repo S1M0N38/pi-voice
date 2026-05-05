@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────────────
-PACKAGE_DIR="/Users/simo/Developer/pi-voice"
+PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_URL="http://127.0.0.1:8181"
 SESSION_PREFIX="voice-test"
 
