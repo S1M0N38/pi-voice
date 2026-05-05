@@ -36,7 +36,7 @@ restore_config() {
   fi
 }
 
-# Minimal summary prompt so auto-TTS generates FAST, maximizing overlap chance
+# Mirror the DEFAULT_CONFIG from extensions/index.ts (full summarization prompt)
 write_test_config() {
   cat > "$HOME/.pi/voice.json" <<'EOF'
 {
@@ -47,7 +47,7 @@ write_test_config() {
   "port": 8181,
   "events": {
     "agent_end": {
-      "prompt": "Reply with exactly: done"
+      "prompt": "You are preparing text for a text-to-speech system. You will receive a message from a conversation enclosed in quadruple backticks. Summarize it in one single very short sentence, two at most. Use a dry, matter-of-fact tone. Do not use any markdown formatting, just plain text. Prefer words over symbols or abbreviations, as this will be read aloud. Output only the sentence, nothing else."
     }
   }
 }
