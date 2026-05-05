@@ -467,6 +467,7 @@ export default function (pi: ExtensionAPI) {
         let selectedRow = 0;
         let playing = false;
         let playError: string | null = null;
+        let feedback: string | null = null;
 
         const rowDefs: Array<{ id: string }> = [
           { id: "enabled" },
@@ -598,10 +599,12 @@ export default function (pi: ExtensionAPI) {
               lines.push(`  ${theme.fg("warning", "▶ Playing sample…")}`);
             } else if (playError) {
               lines.push(`  ${theme.fg("error", `✗ ${playError}`)}`);
+            } else if (feedback) {
+              lines.push(`  ${theme.fg("success", feedback)}`);
             }
 
             lines.push(
-              theme.fg("dim", " ↑↓ navigate • ←→ change • enter test • r reset • esc close"),
+              theme.fg("dim", " ↑↓ navigate • ←→ change • s save default • r reset • esc close"),
             );
 
             return lines;
@@ -609,18 +612,29 @@ export default function (pi: ExtensionAPI) {
           invalidate() {},
           handleInput(data: string) {
             if (matchesKey(data, "escape")) {
+              persistSession();
               done(undefined);
               return;
             }
 
             if (playError) playError = null;
+            if (feedback) feedback = null;
 
             if (playing) return;
 
+            if (matchesKey(data, "s")) {
+              const voice = voices.length > 0 ? voices[voiceIdx] : defaults.voice;
+              const speed = Number.parseFloat(SPEED_VALUES[speedIdx]);
+              defaults = { ...defaults, enabled, voice, speed };
+              saveConfig(defaults);
+              feedback = "✓ Saved as default";
+              _tui.requestRender();
+              return;
+            }
+
             if (matchesKey(data, "r")) {
               session = {};
-              defaults = { ...loadConfig(), ...DEFAULT_CONFIG };
-              saveConfig(defaults);
+              defaults = loadConfig();
               persistSession();
               enabled = defaults.enabled;
               voiceIdx = voices.length > 0 ? Math.max(0, voices.indexOf(defaults.voice)) : -1;
@@ -648,19 +662,13 @@ export default function (pi: ExtensionAPI) {
               if (rowId === "enabled") {
                 enabled = !enabled;
                 session.enabled = enabled;
-                defaults.enabled = enabled;
-                saveConfig(defaults);
               } else if (rowId === "voice" && voices.length > 0) {
                 voiceIdx = (voiceIdx + dir + voices.length) % voices.length;
                 session.voice = voices[voiceIdx];
-                defaults.voice = voices[voiceIdx];
-                saveConfig(defaults);
               } else if (rowId === "speed") {
                 speedIdx = (speedIdx + dir + SPEED_VALUES.length) % SPEED_VALUES.length;
                 const speed = Number.parseFloat(SPEED_VALUES[speedIdx]);
                 session.speed = speed;
-                defaults.speed = speed;
-                saveConfig(defaults);
               }
               persistSession();
               emitConfig();
@@ -781,8 +789,6 @@ export default function (pi: ExtensionAPI) {
       const effective = getEffective();
       const next = !effective.enabled;
       session.enabled = next;
-      defaults.enabled = next;
-      saveConfig(defaults);
       persistSession();
       ctx.ui.notify(`TTS ${next ? "enabled" : "disabled"}`, "info");
       pi.events.emit("voice:config", {
