@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/S1M0N38/pi-voice/compare/v1.1.0...v1.2.0) (2026-05-05)
+
+
+### Features
+
+* serialize audio playback to prevent overlapping speech ([946f533](https://github.com/S1M0N38/pi-voice/commit/946f53364ec243a54c671193e781e46911e62dbd))
+* **server:** add FIFO queue to serialize /tts requests ([82caeb8](https://github.com/S1M0N38/pi-voice/commit/82caeb8bf53e5a4063e933735250a1d750f8dc21))
+
+
+### Bug Fixes
+
+* preserve user events config and persist reset to defaults ([d4e4ad1](https://github.com/S1M0N38/pi-voice/commit/d4e4ad11de3b029e536b972ce9d728c477b9c6f0))
+* resolve biome lint errors blocking CI ([0d764c0](https://github.com/S1M0N38/pi-voice/commit/0d764c018305cccdcfe6be9a3f42cba7e66345e9))
+* **test:** use real default summary prompt in queue test config ([4ad65d4](https://github.com/S1M0N38/pi-voice/commit/4ad65d4bc71eebffc974eb22c75c05ab4111102e))
+
 ## [1.1.0](https://github.com/S1M0N38/pi-voice/compare/v1.0.1...v1.1.0) (2026-05-05)
 
 
