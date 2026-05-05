@@ -39,9 +39,7 @@
   "scripts": {
     "test": "node --import jiti extensions/server.test.ts",
     "test:tui": "bash tests/tui.sh",
-    "test:tts-tool": "bash tests/tts-tool.sh",
-    "test:auto-tts": "bash tests/auto-tts.sh",
-    "test:status-bar": "bash tests/status-bar.sh",
+    "test:toggle": "bash tests/toggle.sh",
     "test:e2e": "bash tests/run.sh",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

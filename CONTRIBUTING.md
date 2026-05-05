@@ -78,6 +78,18 @@ tests/
 
 ---
 
+## Restarting After Changes
+
+| What changed | What to do |
+|--------------|------------|
+| Server (`extensions/server.ts`) | Stop the running server (`Ctrl+C`), then `npm run server` |
+| Extension (`extensions/index.ts`) | Type `/reload` in the pi TUI — extensions are hot-reloaded via jiti, no restart needed |
+| Both | Stop the server, `npm run server`, then `/reload` in pi |
+
+> **Note:** `/reload` only works for extensions in auto-discovered locations (`~/.pi/agent/extensions/` or `.pi/extensions/`). Since pi-voice is a pi package, `/reload` picks up changes to `extensions/index.ts` automatically.
+
+---
+
 ## Development Practices
 
 ### Conventional commits
