@@ -276,6 +276,27 @@ TEXT=$(await_change_and_snapshot_text "$HASH" 500 5000)
 assert_match "Voice TUI re-opened" "Voice" "$TEXT"
 assert_match "Server status shown" "Server running" "$TEXT"
 
+# ── Test 19: alt+v keybind toggles TTS ─────────────────────────────
+log_step "19. alt+v keybind toggles TTS on/off"
+
+# Close /voice first (should still be open from test 18)
+send_key Escape
+sleep 0.3
+
+# Press alt+v to toggle TTS off
+HASH=$(snapshot_content_hash)
+send_key Alt+v
+TEXT=$(await_change_and_snapshot_text "$HASH" 200 5000)
+
+assert_match "Notification shows disabled" "disabled" "$TEXT"
+
+# Press alt+v again to toggle back on
+HASH=$(snapshot_content_hash)
+send_key Alt+v
+TEXT=$(await_change_and_snapshot_text "$HASH" 200 5000)
+
+assert_match "Notification shows enabled" "enabled" "$TEXT"
+
 # ── Cleanup ────────────────────────────────────────────────────────
 log_step "Cleanup"
 send_key Escape

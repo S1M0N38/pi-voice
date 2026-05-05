@@ -26,7 +26,7 @@ RESET='\033[0m'
 # Select tests
 TESTS=( "$@" )
 if [ ${#TESTS[@]} -eq 0 ]; then
-  TESTS=(tui tts-tool auto-tts)
+  TESTS=(tui tts-tool auto-tts status-bar)
 fi
 
 TOTAL_PASSED=0
@@ -37,7 +37,7 @@ for test_name in "${TESTS[@]}"; do
   test_file="$SCRIPT_DIR/${test_name}.sh"
   if [ ! -f "$test_file" ]; then
     echo -e "${RED}Unknown test: $test_name${RESET}"
-    echo "Available: tui, tts-tool, auto-tts"
+    echo "Available: tui, tts-tool, auto-tts, status-bar"
     exit 1
   fi
 

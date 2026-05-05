@@ -41,6 +41,7 @@
     "test:tui": "bash tests/tui.sh",
     "test:tts-tool": "bash tests/tts-tool.sh",
     "test:auto-tts": "bash tests/auto-tts.sh",
+    "test:status-bar": "bash tests/status-bar.sh",
     "test:e2e": "bash tests/run.sh",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -55,9 +56,9 @@
     "kokoro-js": "^1.2.1"
   },
   "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*",
-    "@mariozechner/pi-ai": "*",
     "typebox": "*"
   },
   "devDependencies": {
