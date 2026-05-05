@@ -102,3 +102,7 @@ The server exposes HTTP endpoints at `http://127.0.0.1:8181`:
 ## License
 
 MIT
+
+---
+
+Bootstrapped from [pi-package-template](https://github.com/S1M0N38/pi-package-template).
