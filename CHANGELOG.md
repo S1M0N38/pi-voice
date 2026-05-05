@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0](https://github.com/S1M0N38/pi-voice/compare/v1.0.1...v1.1.0) (2026-05-05)
+
+
+### Features
+
+* add event bus and status bar indicator ([dd8aeeb](https://github.com/S1M0N38/pi-voice/commit/dd8aeeb9327d6ef33c517b63ea0d9539176fe16f))
+
 ## [1.0.1](https://github.com/S1M0N38/pi-voice/compare/v1.0.0...v1.0.1) (2026-05-05)
 
 
