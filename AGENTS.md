@@ -58,7 +58,7 @@ HTTP server managing the Kokoro ONNX TTS model lifecycle. Binds to `127.0.0.1:81
 | POST | `/tts` | Synthesize text → WAV audio |
 | POST | `/shutdown` | Graceful shutdown |
 
-**Model lifecycle** — `loadModel()` → `unloadModel()` → `downloadModel()` all enforce the single-model invariant. Config persisted at `~/.pi/manifest.json`.
+**Model lifecycle** — `loadModel()` → `unloadModel()` → `downloadModel()` all enforce the single-model invariant. Config persisted at `~/.pi/voice/manifest.json`.
 
 ### Extension (`extensions/index.ts`)
 
@@ -66,7 +66,7 @@ HTTP server managing the Kokoro ONNX TTS model lifecycle. Binds to `127.0.0.1:81
 - `tts` tool — LLM-initiated speech synthesis
 - Auto-TTS — listens to `agent_end` events, speaks the last response
 - Settings: on/off toggle, voice selector, speed (0.5–3.0)
-- Persistence: `~/.pi/voice.json` for defaults, session overrides via `pi.appendEntry()`
+- Persistence: `~/.pi/voice/config.json` for defaults, session overrides via `pi.appendEntry()`
 
 ---
 

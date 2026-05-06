@@ -35,7 +35,7 @@ Open the interactive settings UI inside Pi:
 
 Navigate with ↑ ↓, press **Enter** to play a sample, **r** to reset defaults, **Esc** to close.
 
-Settings persist in `~/.pi/voice.json` across sessions.
+Settings persist in `~/.pi/voice/config.json` across sessions.
 
 ### `tts` tool
 
@@ -47,7 +47,7 @@ The agent can speak at any time using the `tts` tool:
 
 ### Auto-TTS
 
-Enable automatic speech after every agent response via the `/voice` settings or by editing `~/.pi/voice.json`:
+Enable automatic speech after every agent response by editing `~/.pi/voice/config.json`:
 
 ```json
 {
@@ -56,13 +56,28 @@ Enable automatic speech after every agent response via the `/voice` settings or 
   "speed": 1.0,
   "events": {
     "agent_end": {
-      "prompt": "Summarize in one short sentence for text-to-speech."
+      "prompt": "Summarize in one short sentence for text-to-speech.",
+      "model": { "provider": "anthropic", "id": "claude-haiku-4-5" }
+    },
+    "turn_end": {
+      "prompt": "Summarize briefly."
+    },
+    "custom_event": {
+      "text": "Custom event triggered."
     }
   }
 }
 ```
 
-When `events.agent_end` is present, pi-voice summarizes the agent's final message using the session model, then speaks it.
+Each event key enables auto-TTS for that event. The value is one of:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prompt` | `string` | LLM system prompt for summarizing the event message. The event's last message is provided as context. |
+| `text` | `string` | Fixed text to speak directly — no LLM call. Mutually exclusive with `prompt`. |
+| `model` | `{ provider, id }` | Optional. Model to use for summarization. If omitted, inherits the active session model. |
+
+Built-in pi events (`agent_end`, `turn_end`, `message_end`) use the message data from the event. Any other key is treated as a custom event on the shared `pi.events` bus.
 
 ## CLI Reference
 

@@ -90,7 +90,7 @@ ctx.events.on("agent_end", async (event) => {
 ### State Persistence
 
 Two-layer persistence:
-- **Global defaults**: `~/.pi/voice.json` (read/write with fs)
+- **Global defaults**: `~/.pi/voice/config.json` (read/write with fs)
 - **Session overrides**: `ctx.session.appendEntry("voice-session", ...)` (session manager)
 
 Read global defaults at startup, layer session overrides on top.
