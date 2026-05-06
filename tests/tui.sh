@@ -16,20 +16,20 @@ require_server
 
 # ── Config lifecycle ───────────────────────────────────────────────
 CONFIG_BACKUP=""
-if [ -f "$HOME/.pi/voice.json" ]; then
-  CONFIG_BACKUP=$(cat "$HOME/.pi/voice.json")
+if [ -f "$HOME/.pi/voice/config.json" ]; then
+  CONFIG_BACKUP=$(cat "$HOME/.pi/voice/config.json")
 fi
 
 restore_config() {
   if [ -n "$CONFIG_BACKUP" ]; then
-    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice.json"
+    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice/config.json"
   else
-    rm -f "$HOME/.pi/voice.json"
+    rm -f "$HOME/.pi/voice/config.json"
   fi
 }
 
 write_clean_config() {
-  cat > "$HOME/.pi/voice.json" <<'EOF'
+  cat > "$HOME/.pi/voice/config.json" <<'EOF'
 {
   "enabled": true,
   "voice": "af_heart",
@@ -113,10 +113,10 @@ TEXT=$(open_voice)
 assert_match "TTS still off (session persisted)" "off" "$TEXT"
 
 # ── Test 4: ←→ does NOT modify voice.json ─────────────────────────
-log_step "4. ←→ does NOT modify ~/.pi/voice.json"
+log_step "4. ←→ does NOT modify ~/.pi/voice/config.json"
 
-FILE_ENABLED=$(cat "$HOME/.pi/voice.json" | jq -r '.enabled')
-assert_equals "voice.json still has enabled=true" "true" "$FILE_ENABLED"
+FILE_ENABLED=$(cat "$HOME/.pi/voice/config.json" | jq -r '.enabled')
+assert_equals "config.json still has enabled=true" "true" "$FILE_ENABLED"
 
 # ── Test 5: s saves as default ─────────────────────────────────────
 log_step "5. s saves current values as default"
@@ -127,8 +127,8 @@ send_key s
 TEXT=$(await_change_and_snapshot_text "$HASH" 50)
 assert_match "Feedback shows 'Saved as default'" "Saved as default" "$TEXT"
 
-FILE_ENABLED=$(cat "$HOME/.pi/voice.json" | jq -r '.enabled')
-assert_equals "voice.json now has enabled=false" "false" "$FILE_ENABLED"
+FILE_ENABLED=$(cat "$HOME/.pi/voice/config.json" | jq -r '.enabled')
+assert_equals "config.json now has enabled=false" "false" "$FILE_ENABLED"
 
 # ── Test 6: r resets to config ─────────────────────────────────────
 log_step "6. r resets to config defaults"
@@ -145,7 +145,7 @@ HASH=$(snapshot_content_hash)
 send_key Right
 TEXT=$(await_change_and_snapshot_text "$HASH" 50)
 
-# Now reset — should go back to voice.json values (enabled=false, voice=af_heart, speed=1.0)
+# Now reset — should go back to config.json values (enabled=false, voice=af_heart, speed=1.0)
 HASH=$(snapshot_content_hash)
 send_key r
 TEXT=$(await_change_and_snapshot_text "$HASH" 100)

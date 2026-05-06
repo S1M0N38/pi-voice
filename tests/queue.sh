@@ -24,21 +24,21 @@ require_server
 
 # ── Config lifecycle ───────────────────────────────────────────────
 CONFIG_BACKUP=""
-if [ -f "$HOME/.pi/voice.json" ]; then
-  CONFIG_BACKUP=$(cat "$HOME/.pi/voice.json")
+if [ -f "$HOME/.pi/voice/config.json" ]; then
+  CONFIG_BACKUP=$(cat "$HOME/.pi/voice/config.json")
 fi
 
 restore_config() {
   if [ -n "$CONFIG_BACKUP" ]; then
-    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice.json"
+    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice/config.json"
   else
-    rm -f "$HOME/.pi/voice.json"
+    rm -f "$HOME/.pi/voice/config.json"
   fi
 }
 
 # Mirror the DEFAULT_CONFIG from extensions/index.ts (full summarization prompt)
 write_test_config() {
-  cat > "$HOME/.pi/voice.json" <<'EOF'
+  cat > "$HOME/.pi/voice/config.json" <<'EOF'
 {
   "enabled": true,
   "voice": "af_heart",

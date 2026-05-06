@@ -16,20 +16,20 @@ require_server
 
 # ── Config lifecycle ───────────────────────────────────────────────
 CONFIG_BACKUP=""
-if [ -f "$HOME/.pi/voice.json" ]; then
-  CONFIG_BACKUP=$(cat "$HOME/.pi/voice.json")
+if [ -f "$HOME/.pi/voice/config.json" ]; then
+  CONFIG_BACKUP=$(cat "$HOME/.pi/voice/config.json")
 fi
 
 restore_config() {
   if [ -n "$CONFIG_BACKUP" ]; then
-    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice.json"
+    echo "$CONFIG_BACKUP" > "$HOME/.pi/voice/config.json"
   else
-    rm -f "$HOME/.pi/voice.json"
+    rm -f "$HOME/.pi/voice/config.json"
   fi
 }
 
 write_clean_config() {
-  cat > "$HOME/.pi/voice.json" <<'EOF'
+  cat > "$HOME/.pi/voice/config.json" <<'EOF'
 {
   "enabled": true,
   "voice": "af_heart",
@@ -65,10 +65,10 @@ TEXT=$(await_change_and_snapshot_text "$HASH" 200 5000)
 assert_match "Notification shows disabled" "disabled" "$TEXT"
 
 # ── Test 3: alt+v does NOT modify voice.json ──────────────────────
-log_step "3. alt+v does NOT modify ~/.pi/voice.json"
+log_step "3. alt+v does NOT modify ~/.pi/voice/config.json"
 
-FILE_ENABLED=$(cat "$HOME/.pi/voice.json" | jq -r '.enabled')
-assert_equals "voice.json still has enabled=true" "true" "$FILE_ENABLED"
+FILE_ENABLED=$(cat "$HOME/.pi/voice/config.json" | jq -r '.enabled')
+assert_equals "config.json still has enabled=true" "true" "$FILE_ENABLED"
 
 # ── Test 4: alt+v toggles back on ─────────────────────────────────
 log_step "4. alt+v toggles TTS back on — notification shows enabled"

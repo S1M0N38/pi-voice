@@ -65,7 +65,7 @@ source "$(dirname "$0")/helpers.sh"
 require_server
 
 # Clean up old WAV files
-rm -f "$HOME/.pi"/voice-*.wav 2>/dev/null || true
+rm -f "$HOME/.pi/voice"/voice-*.wav 2>/dev/null || true
 
 spawn_pi
 wait_for_pi
@@ -82,7 +82,7 @@ TEXT=$(snapshot_text)
 assert_match "Agent mentions speech" "Speaking\|tts\|audio\|speech" "$TEXT"
 
 # Verify WAV file was created
-WAV_FILE=$(find "$HOME/.pi" -name 'voice-*.wav' -newer "$HOME/.pi/voice.json" 2>/dev/null | head -1)
+WAV_FILE=$(find "$HOME/.pi/voice" -name 'voice-*.wav' -newer "$HOME/.pi/voice/config.json" 2>/dev/null | head -1)
 if [ -n "$WAV_FILE" ]; then
   HEADER=$(xxd -l 4 "$WAV_FILE" | awk '{print $2 $3}')
   [ "$HEADER" = "52494646" ] && log_pass "Valid WAV (RIFF header)"
@@ -144,7 +144,7 @@ PROXY_PID=$!
 sleep 2  # wait for proxy to start
 
 # Configure pi-voice to use proxy
-echo "{\"enabled\":true,\"voice\":\"af_heart\",\"speed\":1.0,\"host\":\"127.0.0.1\",\"port\":$PROXY_PORT,\"events\":{\"agent_end\":{\"prompt\":\"Summarize in one sentence.\"}}}" > "$HOME/.pi/voice.json"
+echo "{\"enabled\":true,\"voice\":\"af_heart\",\"speed\":1.0,\"host\":\"127.0.0.1\",\"port\":$PROXY_PORT,\"events\":{\"agent_end\":{\"prompt\":\"Summarize in one sentence.\"}}}" > "$HOME/.pi/voice/config.json"
 
 spawn_pi
 wait_for_pi
@@ -177,7 +177,7 @@ source "$(dirname "$0")/helpers.sh"
 require_server
 
 # Set known config
-echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice.json"
+echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice/config.json"
 
 spawn_pi
 wait_for_pi
@@ -221,7 +221,7 @@ Tests that cursor wraps from last→first and first→last row. Pattern from `te
 source "$(dirname "$0")/helpers.sh"
 require_server
 
-echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice.json"
+echo '{"enabled":true,"voice":"af_heart","speed":1.0,"host":"127.0.0.1","port":8181}' > "$HOME/.pi/voice/config.json"
 
 spawn_pi
 wait_for_pi
