@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0](https://github.com/S1M0N38/pi-voice/compare/v1.2.0...v2.0.0) (2026-05-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* Config moved from ~/.pi/voice.json to ~/.pi/voice/config.json. The summaryModel field is removed; use per-event model in events config instead. EventConfig now accepts { prompt, model? } or { text } (mutually exclusive).
+
+### Features
+
+* overhaul event config and migrate state to ~/.pi/voice/ ([3242af6](https://github.com/S1M0N38/pi-voice/commit/3242af6f51d5ed3f50467777f6be9d09bfca7630))
+
 ## [1.2.0](https://github.com/S1M0N38/pi-voice/compare/v1.1.0...v1.2.0) (2026-05-05)
 
 
