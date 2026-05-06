@@ -24,7 +24,8 @@ import extensionFactory from "./index.js";
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const CONFIG_PATH = resolve(homedir(), ".pi", "voice.json");
+const CONFIG_DIR = resolve(homedir(), ".pi", "voice");
+const CONFIG_PATH = resolve(CONFIG_DIR, "config.json");
 const KEY_ESCAPE = "\x1b";
 const KEY_ENTER = "\r";
 const KEY_LEFT = "\x1b[D";
@@ -91,7 +92,7 @@ function restoreConfig() {
   }
 }
 
-/** Write a clean test config without summaryModel (avoids real model lookup). */
+/** Write a clean test config without event model (avoids real model lookup). */
 function writeTestConfig(overrides: Record<string, unknown> = {}) {
   writeFileSync(
     CONFIG_PATH,

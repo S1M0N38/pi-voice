@@ -18,8 +18,8 @@
  *   --host <host>   Override server host (default: 127.0.0.1)
  *   --port <port>   Override server port (default: 8181)
  *
- * Configuration: ~/.pi/voice.json
- * PID file:      ~/.pi/voice.pid
+ * Configuration: ~/.pi/voice/config.json
+ * PID file:      ~/.pi/voice/voice.pid
  */
 
 import { spawn } from "node:child_process";
@@ -32,14 +32,14 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(__dirname, "..");
 const SERVER_SCRIPT = resolve(PACKAGE_ROOT, "extensions", "server.ts");
-const CONFIG_DIR = resolve(homedir(), ".pi");
-const CONFIG_PATH = resolve(CONFIG_DIR, "voice.json");
+const CONFIG_DIR = resolve(homedir(), ".pi", "voice");
+const CONFIG_PATH = resolve(CONFIG_DIR, "config.json");
 const PID_PATH = resolve(CONFIG_DIR, "voice.pid");
 
 const DTYPES = ["q4", "q4f16", "q8", "fp16", "fp32"] as const;
 type DType = (typeof DTYPES)[number];
 
-// ── Config (~/.pi/voice.json) ──────────────────────────────────────
+// ── Config (~/.pi/voice/config.json) ──────────────────────────────
 
 interface VoiceConfig {
   host?: string;
@@ -461,7 +461,7 @@ Options:
   --host <host>   Override server host (default: 127.0.0.1)
   --port <port>   Override server port (default: 8181)
 
-Configuration: ~/.pi/voice.json
+Configuration: ~/.pi/voice/config.json
 Models:         q4, q4f16, q8, fp16, fp32`);
 }
 

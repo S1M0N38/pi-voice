@@ -7,15 +7,21 @@
  *   - Speed selector (0.5 – 3.0)
  *
  * Persistence:
- *   - Global defaults: ~/.pi/voice.json
+ *   - Global defaults: ~/.pi/voice/config.json
  *   - Session overrides: pi.appendEntry("voice-session", ...)
  *
  * Auto-TTS events:
- *   - Configured via events: Record<string, { prompt: string }> in ~/.pi/voice.json
+ *   - Configured via events: Record<string, EventConfig> in ~/.pi/voice/config.json
+ *   - EventConfig is one of:
+ *     - { prompt: string, model?: { provider, id } } — summarize event context via LLM, then speak
+ *     - { text: string } — speak the text directly (no LLM)
+ *   - prompt and text are mutually exclusive
+ *   - model is optional per-event; if omitted, inherits the active session model
  *   - Default: agent_end with last_message context
  *   - Any event name can be used; presence in config = enabled
- *   - Context is always last_message from the event data
- *   - Uses summaryModel if configured, otherwise falls back to active session model
+ *   - Built-in pi events (agent_end, turn_end, message_end) use pi.on()
+ *   - Custom events (e.g. ask:started) use the shared pi.events bus
+ *   - Uses per-event model if configured, otherwise inherits the active session model
  *
  * Agent tool:
  *   - tts: converts text → WAV via the TTS server, plays it.
@@ -38,13 +44,20 @@ import { Type } from "typebox";
 
 // ── Types ──────────────────────────────────────────────────────────
 
-interface SummaryModelConfig {
+interface ModelConfig {
   provider: string;
   id: string;
 }
 
-interface EventConfig {
+type EventConfig = SummarizeEventConfig | DirectEventConfig;
+
+interface SummarizeEventConfig {
   prompt: string;
+  model?: ModelConfig;
+}
+
+interface DirectEventConfig {
+  text: string;
 }
 
 interface FullVoiceConfig {
@@ -53,7 +66,6 @@ interface FullVoiceConfig {
   speed: number;
   host: string;
   port: number;
-  summaryModel?: SummaryModelConfig;
   events?: Record<string, EventConfig>;
 }
 
@@ -94,14 +106,21 @@ export interface VoiceEventMap {
 
 // ── Configuration Schema (TypeBox) ───────────────────────────────
 
-const SummaryModelSchema = Type.Object({
+const ModelSchema = Type.Object({
   provider: Type.String({ minLength: 1 }),
   id: Type.String({ minLength: 1 }),
 });
 
-const EventConfigSchema = Type.Object({
+const SummarizeEventConfigSchema = Type.Object({
   prompt: Type.String({ minLength: 1 }),
+  model: Type.Optional(ModelSchema),
 });
+
+const DirectEventConfigSchema = Type.Object({
+  text: Type.String({ minLength: 1 }),
+});
+
+const EventConfigSchema = Type.Union([SummarizeEventConfigSchema, DirectEventConfigSchema]);
 
 const _VoiceConfigSchema = Type.Object({
   enabled: Type.Optional(Type.Boolean({ default: true })),
@@ -109,13 +128,13 @@ const _VoiceConfigSchema = Type.Object({
   speed: Type.Optional(Type.Number({ minimum: 0.5, maximum: 3.0, default: 1.0 })),
   host: Type.Optional(Type.String({ default: "127.0.0.1" })),
   port: Type.Optional(Type.Number({ minimum: 1, maximum: 65535, default: 8181 })),
-  summaryModel: Type.Optional(SummaryModelSchema),
   events: Type.Optional(Type.Record(Type.String(), EventConfigSchema)),
 });
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const CONFIG_PATH = resolve(homedir(), ".pi", "voice.json");
+const CONFIG_DIR = resolve(homedir(), ".pi", "voice");
+const CONFIG_PATH = resolve(CONFIG_DIR, "config.json");
 const SPEED_VALUES = [
   "0.5",
   "0.75",
@@ -177,7 +196,7 @@ const DEFAULT_CONFIG: FullVoiceConfig = {
   },
 };
 
-// ── Config file persistence (~/.pi/voice.json) ────────────────────
+// ── Config file persistence (~/.pi/voice/config.json) ──────────────
 
 function loadConfig(): FullVoiceConfig {
   try {
@@ -191,7 +210,6 @@ function loadConfig(): FullVoiceConfig {
         speed: raw.speed ?? DEFAULT_CONFIG.speed,
         host: raw.host ?? DEFAULT_CONFIG.host,
         port: raw.port ?? DEFAULT_CONFIG.port,
-        summaryModel: raw.summaryModel,
         events: raw.events,
       };
     }
@@ -202,8 +220,7 @@ function loadConfig(): FullVoiceConfig {
 }
 
 function saveConfig(config: FullVoiceConfig) {
-  const dir = resolve(homedir(), ".pi");
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(CONFIG_DIR, { recursive: true });
   writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
 }
 
@@ -243,18 +260,16 @@ async function generateSpeechText(
   prompt: string,
   context: string,
   ctx: ExtensionContext,
-  summaryModel?: SummaryModelConfig,
+  modelConfig?: ModelConfig,
 ): Promise<string | null> {
   try {
-    // Resolve model: explicit summaryModel > active session model
-    const model = summaryModel
-      ? ctx.modelRegistry.find(summaryModel.provider, summaryModel.id)
+    // Resolve model: per-event model > active session model
+    const model = modelConfig
+      ? ctx.modelRegistry.find(modelConfig.provider, modelConfig.id)
       : ctx.model;
     if (!model) {
-      if (summaryModel) {
-        console.warn(
-          `[pi-voice] Summary model not found: ${summaryModel.provider}/${summaryModel.id}`,
-        );
+      if (modelConfig) {
+        console.warn(`[pi-voice] Event model not found: ${modelConfig.provider}/${modelConfig.id}`);
       } else {
         console.warn("[pi-voice] No active model available for speech generation.");
       }
@@ -321,7 +336,6 @@ export default function (pi: ExtensionAPI) {
       speed: session.speed ?? defaults.speed,
       host: defaults.host,
       port: defaults.port,
-      summaryModel: defaults.summaryModel,
       events: defaults.events,
     };
   }
@@ -409,8 +423,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       const wavBuffer = Buffer.from(await res.arrayBuffer());
-      const outPath = join(homedir(), ".pi", `voice-${Date.now()}.wav`);
-      mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
+      const outPath = join(CONFIG_DIR, `voice-${Date.now()}.wav`);
+      mkdirSync(CONFIG_DIR, { recursive: true });
       writeFileSync(outPath, wavBuffer);
 
       enqueueAudio({
@@ -455,13 +469,22 @@ export default function (pi: ExtensionAPI) {
     try {
       if (!config.enabled) return;
       if (!config.events?.[eventName]) return;
-      // summaryModel is optional — falls back to ctx.model
+      // model is optional per-event — falls back to ctx.model
 
       const eventConfig = config.events[eventName];
+
+      // Direct text — speak immediately, no LLM
+      if ("text" in eventConfig) {
+        await speak(eventConfig.text, config, "auto");
+        return;
+      }
+
+      // Summarize — extract context and run through LLM
+
       const context = extractLastMessage(event);
       if (!context) return;
 
-      const text = await generateSpeechText(eventConfig.prompt, context, ctx, config.summaryModel);
+      const text = await generateSpeechText(eventConfig.prompt, context, ctx, eventConfig.model);
       if (!text) return;
 
       await speak(text, config, "auto");
@@ -560,8 +583,8 @@ export default function (pi: ExtensionAPI) {
               throw new Error(errData.error || "Server error");
             }
             const wavBuffer = Buffer.from(await res.arrayBuffer());
-            const outPath = join(homedir(), ".pi", "voice-sample.wav");
-            mkdirSync(resolve(homedir(), ".pi"), { recursive: true });
+            const outPath = join(CONFIG_DIR, "voice-sample.wav");
+            mkdirSync(CONFIG_DIR, { recursive: true });
             writeFileSync(outPath, wavBuffer);
             const cmd = process.platform === "darwin" ? "afplay" : "aplay";
             await new Promise<void>((resolve, reject) => {
@@ -855,8 +878,9 @@ export default function (pi: ExtensionAPI) {
 
   // ── Auto-TTS event handlers ─────────────────────────────────────
 
-  // Register handlers for events that carry message data.
+  // Built-in pi events that carry message data.
   // Each handler checks at runtime if the event is configured.
+  // Note: pi.on() requires literal event names (not variables) for type safety.
 
   pi.on("agent_end", async (event, ctx) => {
     const effective = getEffective();
@@ -878,4 +902,36 @@ export default function (pi: ExtensionAPI) {
       console.warn("[pi-voice] Auto-TTS error:", err),
     );
   });
+
+  const builtinEventNames = new Set(["agent_end", "turn_end", "message_end"]);
+
+  // Custom events from other extensions (via shared event bus).
+  // Any event name in config that isn't a built-in pi event is treated
+  // as a custom event. If the event config has a `text` field, it's
+  // spoken directly without LLM summarization.
+
+  const customUnsubs: Array<() => void> = [];
+
+  function registerCustomEvents() {
+    // Remove previous listeners
+    for (const unsub of customUnsubs) unsub();
+    customUnsubs.length = 0;
+
+    const events = defaults.events;
+    if (!events) return;
+
+    for (const eventName of Object.keys(events)) {
+      if (builtinEventNames.has(eventName)) continue;
+      const unsub = pi.events.on(eventName, (data: unknown) => {
+        if (!currentCtx) return;
+        const effective = getEffective();
+        handleAutoTTS(eventName, data, currentCtx, effective).catch((err) =>
+          console.warn("[pi-voice] Auto-TTS error:", err),
+        );
+      });
+      customUnsubs.push(unsub);
+    }
+  }
+
+  registerCustomEvents();
 }

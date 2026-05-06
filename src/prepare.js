@@ -14,8 +14,8 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
-const CONFIG_DIR = resolve(homedir(), ".pi");
-const CONFIG_FILE = resolve(CONFIG_DIR, "voice.json");
+const CONFIG_DIR = resolve(homedir(), ".pi", "voice");
+const CONFIG_FILE = resolve(CONFIG_DIR, "config.json");
 
 const DEFAULT_SUMMARY_PROMPT =
   "You are preparing text for a text-to-speech system. " +

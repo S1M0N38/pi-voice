@@ -35,8 +35,8 @@ function getArg(name: string, fallback: string): string {
 
 const HOST = getArg("host", "127.0.0.1");
 const PORT = Number.parseInt(getArg("port", "8181"), 10);
-const CONFIG_DIR = resolve(homedir(), ".pi");
-const MANIFEST_PATH = join(CONFIG_DIR, "manifest.json");
+const VOICE_DIR = resolve(homedir(), ".pi", "voice");
+const MANIFEST_PATH = join(VOICE_DIR, "manifest.json");
 
 // ── Cache discovery ────────────────────────────────────────────────
 // transformers.js stores ONNX models in a .cache directory next to itself.
@@ -83,7 +83,7 @@ function loadManifest(): Manifest {
 }
 
 function saveManifest(manifest: Manifest) {
-  mkdirSync(CONFIG_DIR, { recursive: true });
+  mkdirSync(VOICE_DIR, { recursive: true });
   writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
