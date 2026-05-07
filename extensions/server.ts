@@ -19,8 +19,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
 // ── Configuration ──────────────────────────────────────────────────
 const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
@@ -38,27 +37,16 @@ const PORT = Number.parseInt(getArg("port", "8181"), 10);
 const VOICE_DIR = resolve(homedir(), ".pi", "voice");
 const MANIFEST_PATH = join(VOICE_DIR, "manifest.json");
 
-// ── Cache discovery ────────────────────────────────────────────────
-// transformers.js stores ONNX models in a .cache directory next to itself.
-// We resolve the path dynamically so it works regardless of HF_HOME.
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_ROOT = resolve(__dirname, "..");
-
-function getCacheDir(): string {
-  // Try package-local node_modules first
-  const local = resolve(PACKAGE_ROOT, "node_modules", "@huggingface", "transformers", ".cache");
-  if (existsSync(local)) return local;
-  // Fallback: create it
-  mkdirSync(local, { recursive: true });
-  return local;
-}
+// ── Cache ──────────────────────────────────────────────────────────
+// Persistent cache outside node_modules — survives npm install cycles.
+const CACHE_DIR = join(VOICE_DIR, "cache");
 
 function getOnnxPath(dtype: DType): string {
-  // transformers.js stores: .cache/<org>/<repo>/onnx/model_<dtype>.onnx
+  // transformers.js stores: cache/<org>/<repo>/onnx/model_<dtype>.onnx
   const parts = MODEL_ID.split("/");
   const org = parts[0] ?? "";
   const repo = parts[1] ?? "";
-  return resolve(getCacheDir(), org, repo, "onnx", `model_${dtype}.onnx`);
+  return resolve(CACHE_DIR, org, repo, "onnx", `model_${dtype}.onnx`);
 }
 
 function isDtypeDownloaded(dtype: DType): boolean {
@@ -177,6 +165,7 @@ async function loadModel(dtype: DType): Promise<import("kokoro-js").KokoroTTS> {
 
     console.log(`[pi-voice] Loading model: ${MODEL_ID} (dtype=${dtype}) ...`);
     const { env } = await import("@huggingface/transformers");
+    env.cacheDir = CACHE_DIR;
     env.allowLocalModels = true;
     env.useBrowserCache = false;
     tts = await KokoroTTS.from_pretrained(MODEL_ID, {
@@ -196,6 +185,8 @@ async function downloadModel(dtype: DType): Promise<void> {
   await importKokoro();
 
   console.log(`[pi-voice] Downloading model: ${MODEL_ID} (dtype=${dtype}) ...`);
+  const { env } = await import("@huggingface/transformers");
+  env.cacheDir = CACHE_DIR;
   const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
     dtype,
     device: "cpu",
@@ -215,6 +206,8 @@ async function downloadOnlyModel(dtype: DType): Promise<void> {
   await importKokoro();
 
   console.log(`[pi-voice] Downloading model (no activate): ${MODEL_ID} (dtype=${dtype}) ...`);
+  const { env } = await import("@huggingface/transformers");
+  env.cacheDir = CACHE_DIR;
   const instance = await KokoroTTS.from_pretrained(MODEL_ID, {
     dtype,
     device: "cpu",
@@ -586,6 +579,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`[pi-voice] Server listening on http://${HOST}:${PORT}`);
-  console.log(`[pi-voice] Cache dir: ${getCacheDir()}`);
+  console.log(`[pi-voice] Cache dir: ${CACHE_DIR}`);
   console.log("[pi-voice] Use /models to see available models");
 });

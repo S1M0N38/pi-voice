@@ -16,7 +16,7 @@ The `pi-voice` CLI is available after install. Start the server and download the
 
 ```bash
 pi-voice server                      # start on 127.0.0.1:8181
-pi-voice download q4                 # download + activate the q4 model (~70 MB)
+pi-voice download q4                 # download + activate the q4 model (~291 MB)
 ```
 
 ## Usage
@@ -94,9 +94,15 @@ pi-voice voices                              # list available voices
 
 | Dtype | Size | Quality | Notes |
 |-------|------|---------|-------|
-| `q4` | ~70 MB | Good | Recommended default |
+| `q4` | ~291 MB | Good | 4-bit matmul — recommended default |
+| `q4f16` | ~147 MB | Good | 4-bit matmul + fp16 weights — smaller, good trade-off |
+| `q8` | ~88 MB | Great | 8-bit quantized — best quality/size ratio |
+| `fp16` | ~156 MB | Excellent | Half-precision floats |
+| `fp32` | ~310 MB | Best | Full-precision floats — largest, highest quality |
 
 Only one model is loaded at a time. Downloading or activating a new model automatically unloads the previous one.
+
+Model files are cached at `~/.pi/voice/cache/` and persist across `npm install` cycles. To reclaim disk space, use `pi-voice delete <dtype>`.
 
 ## API
 
