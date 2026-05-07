@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1](https://github.com/S1M0N38/pi-voice/compare/v2.0.0...v2.0.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* move model cache to ~/.pi/voice/cache/ ([2ed7462](https://github.com/S1M0N38/pi-voice/commit/2ed74626d4f7904e67e58f0b469a29335d3c1715))
+
 ## [2.0.0](https://github.com/S1M0N38/pi-voice/compare/v1.2.0...v2.0.0) (2026-05-06)
 
 
