@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0](https://github.com/S1M0N38/pi-voice/compare/v2.0.1...v3.0.0) (2026-07-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* migrate to @earendil-works namespace and pi 0.83 ModelRuntime
+
+### Bug Fixes
+
+* **cli:** run the TS CLI via a jiti launcher, spawn server with absolute jiti-register ([84faaf2](https://github.com/S1M0N38/pi-voice/commit/84faaf22c75fb65e8d8f09c4da4bdf57ce13c023))
+* **extension:** play audio via execFile with player fallback; temp WAVs in os.tmpdir() ([e7e1ebd](https://github.com/S1M0N38/pi-voice/commit/e7e1ebdcc40bd76706fd4d0c5f5626200d5519b9))
+* migrate to [@earendil-works](https://github.com/earendil-works) namespace and pi 0.83 ModelRuntime ([926b6d4](https://github.com/S1M0N38/pi-voice/commit/926b6d4dca5cdc897b323e9929af618d93366008))
+* register jiti via module resolution for global install ([99f3e63](https://github.com/S1M0N38/pi-voice/commit/99f3e639169900478845408c7eacbbf5e651e3ec))
+* restore saved config on /voice reset ([35ebc0b](https://github.com/S1M0N38/pi-voice/commit/35ebc0b29fdf5611e893c28aa1797fb5500403bd))
+* **server:** serialize model ops, self-heal corrupt cache, fix dtype file mapping ([93140d6](https://github.com/S1M0N38/pi-voice/commit/93140d6472ebdb54259035a25ebfa6ed0e29e7b9))
+* **server:** strip markdown from text before synthesis ([7e1201e](https://github.com/S1M0N38/pi-voice/commit/7e1201e4f5b9bfc05680c3c05ff1dcc1caf1c22d))
+
 ## [2.0.1](https://github.com/S1M0N38/pi-voice/compare/v2.0.0...v2.0.1) (2026-05-07)
 
 
