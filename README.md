@@ -1,3 +1,6 @@
+> [!WARNING]
+> This project is no longer maintained. Inspired by [earendil-works/pi-transcribe](https://github.com/earendil-works/pi-transcribe), I've drastically simplified this extension and created a new similar extension to pi-voice: [S1M0N38/pi-speak](https://github.com/S1M0N38/pi-speak).
+
 # pi-voice
 
 Give your Pi agent a voice.
